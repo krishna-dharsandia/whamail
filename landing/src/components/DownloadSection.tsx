@@ -57,8 +57,8 @@ export default function DownloadSection() {
       </Badge>
 
       <div className="flex flex-col gap-3 w-full">
-        {findAsset(`Whamail.Setup.${ver}.exe`) && (
-          <a href={findAsset(`Whamail.Setup.${ver}.exe`)}>
+        {findAsset("Whamail-x64.exe") && (
+          <a href={findAsset("Whamail-x64.exe")!}>
             <Button className="w-full h-11 text-base gap-2">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
                 <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -66,7 +66,20 @@ export default function DownloadSection() {
                 <rect x="14" y="14" width="7" height="7" rx="1" />
                 <rect x="3" y="14" width="7" height="7" rx="1" />
               </svg>
-              Download for Windows
+              Download for Windows (64-bit)
+            </Button>
+          </a>
+        )}
+        {findAsset("Whamail-ia32.exe") && (
+          <a href={findAsset("Whamail-ia32.exe")!}>
+            <Button variant="outline" className="w-full h-11 text-base gap-2">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-5 w-5">
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+              </svg>
+              Download for Windows (32-bit)
             </Button>
           </a>
         )}

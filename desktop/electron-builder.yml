@@ -1,5 +1,6 @@
 appId: app.whamail.desktop
 productName: Whamail
+executableName: Whamail
 copyright: Copyright © 2026 Whamail
 
 directories:
@@ -20,21 +21,16 @@ extraResources:
 
 win:
   target:
-    - target: nsis
+    - target: portable
       arch:
         - x64
-  artifactName: Whamail.Setup.${version}.${ext}
+        - ia32
+  artifactName: Whamail-${arch}.exe
   icon: build/icon.png
 
-nsis:
-  oneClick: false
-  allowToChangeInstallationDirectory: true
-  deleteAppDataOnUninstall: true
-  createDesktopShortcut: true
-  createStartMenuShortcut: true
-  shortcutName: Whamail
-  license: LICENSE.txt
-  runAfterFinish: true
+portable:
+  requestExecutionLevel: user
+  unpackDirName: Whamail
 
 mac:
   target:
@@ -42,7 +38,7 @@ mac:
       arch:
         - x64
         - arm64
-  artifactName: Whamail-${version}-${arch}.${ext}
+  artifactName: Whamail-${version}-${arch}.dmg
   category: public.app-category.productivity
   hardenedRuntime: true
   icon: build/icon.png
