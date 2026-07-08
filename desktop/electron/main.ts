@@ -177,6 +177,7 @@ function createWindow() {
     minHeight: 600,
     show: false,
     title: "Whamail",
+    autoHideMenuBar: true,
     icon: join(__dirname, "..", "build", "icon.png"),
     webPreferences: {
       preload: join(__dirname, "preload.js"),

@@ -38,7 +38,7 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: desktop/release/Whamail-Setup-*-x64.exe
+          files: desktop/dist/Whamail-Setup-*-x64.exe
           generate_release_notes: true
 
   build-mac-arm64:
@@ -71,7 +71,7 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: desktop/release/Whamail-*-arm64.dmg
+          files: desktop/dist/Whamail-*-arm64.dmg
           generate_release_notes: true
 
   build-mac-x64:
@@ -104,5 +104,5 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: desktop/release/Whamail-*-x64.dmg
+          files: desktop/dist/Whamail-*-x64.dmg
           generate_release_notes: true
