@@ -39,7 +39,7 @@ function getApiPath(): { command: string; args: string[]; cwd: string } {
   if (isDev) {
     // In dev, use dotnet run pointing to the API project
     const projectDir = process.env.MAILBRIDGE_API_PROJECT
-      || join(__dirname, "..", "..", "MailBridge.API", "MailBridge.API");
+      || join(__dirname, "..", "..", "MailBridge.API");
     return {
       command: "dotnet",
       args: ["run", "--project", projectDir, "--no-launch-profile"],

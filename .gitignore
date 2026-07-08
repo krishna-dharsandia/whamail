@@ -15,6 +15,7 @@ api/publish/
 # .NET
 bin/
 obj/
+publish/
 *.user
 *.suo
 .vs/
