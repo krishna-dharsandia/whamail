@@ -4,7 +4,7 @@ executableName: Whamail
 copyright: Copyright © 2026 Whamail
 
 directories:
-  output: release/build
+  output: release
   buildResources: build
 
 files:
@@ -21,17 +21,30 @@ extraResources:
 
 compression: normal
 
+protocols:
+  name: Whamail
+  schemes:
+    - whamail
+
 win:
   target:
-    - target: portable
+    - target: nsis
       arch:
         - x64
-  artifactName: Whamail-${arch}.exe
+  artifactName: Whamail-Setup-${version}-${arch}.exe
   icon: build/icon.png
 
-portable:
-  requestExecutionLevel: user
-  unpackDirName: Whamail
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Whamail
+  artifactName: Whamail-Setup-${version}-${arch}.exe
 
 mac:
   target:
@@ -42,7 +55,7 @@ mac:
   artifactName: Whamail-${version}-${arch}.dmg
   category: public.app-category.productivity
   hardenedRuntime: true
-  icon: build/icon.png
+  icon: build/icon.icns
 
 dmg:
   title: Whamail ${version}
@@ -53,11 +66,3 @@ dmg:
       y: 220
       type: link
       path: /Applications
-
-linux:
-  target:
-    - target: AppImage
-      arch:
-        - x64
-  category: Network
-  icon: build/icons

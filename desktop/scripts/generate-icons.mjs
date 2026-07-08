@@ -109,4 +109,62 @@ for (const size of sizes) {
 writeFileSync(join(root, "build", "icon.png"), createPng(512));
 console.log("build/icon.png (512x512)");
 
+// Generate .ico (multi-size Windows icon)
+function createIco(pngBuffers) {
+  const count = pngBuffers.length;
+  const headerSize = 6 + count * 16;
+  const header = Buffer.alloc(6);
+  header.writeUInt16LE(0, 0);      // reserved
+  header.writeUInt16LE(1, 2);      // type: icon
+  header.writeUInt16LE(count, 4);  // image count
+
+  const entries = [];
+  let offset = headerSize;
+  for (const { size, data } of pngBuffers) {
+    const entry = Buffer.alloc(16);
+    entry[0] = size >= 256 ? 0 : size; // width (0 = 256)
+    entry[1] = size >= 256 ? 0 : size; // height
+    entry[2] = 0;  // color palette
+    entry[3] = 0;  // reserved
+    entry.writeUInt16LE(1, 4);         // color planes
+    entry.writeUInt16LE(32, 6);        // bits per pixel
+    entry.writeUInt32LE(data.length, 8);
+    entry.writeUInt32LE(offset, 12);
+    entries.push(entry);
+    offset += data.length;
+  }
+
+  return Buffer.concat([header, ...entries, ...pngBuffers.map(p => p.data)]);
+}
+
+const icoSizes = [16, 24, 32, 48, 64, 128, 256];
+const icoPngs = icoSizes.map(size => ({ size, data: createPng(size) }));
+writeFileSync(join(root, "build", "icon.ico"), createIco(icoPngs));
+console.log("build/icon.ico (multi-size)");
+
+// Generate .icns for macOS
+function createIcns(pngBuffers) {
+  // Minimal .icns with PNG data for key sizes
+  const typeMap = { 32: "icp4", 64: "icp5", 128: "ic07", 256: "ic08", 512: "ic09" };
+  const chunks = [];
+  for (const { size, data } of pngBuffers) {
+    const type = typeMap[size];
+    if (!type) continue;
+    const chunkHeader = Buffer.alloc(8);
+    chunkHeader.write(type, 0, 4, "ascii");
+    chunkHeader.writeUInt32BE(data.length + 8, 4);
+    chunks.push(Buffer.concat([chunkHeader, data]));
+  }
+  const body = Buffer.concat(chunks);
+  const header = Buffer.alloc(8);
+  header.write("icns", 0, 4, "ascii");
+  header.writeUInt32BE(body.length + 8, 4);
+  return Buffer.concat([header, body]);
+}
+
+const icnsSizes = [32, 64, 128, 256, 512];
+const icnsPngs = icnsSizes.map(size => ({ size, data: createPng(size) }));
+writeFileSync(join(root, "build", "icon.icns"), createIcns(icnsPngs));
+console.log("build/icon.icns (macOS)");
+
 console.log("\nReplace with proper design for production.");

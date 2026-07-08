@@ -16,12 +16,14 @@
     "typecheck": "tsc --noEmit",
     "electron:dev": "cross-env NODE_ENV=development concurrently -n next,electron -c blue,green \"next dev --turbopack\" \"node -e \\\"setTimeout(()=>process.exit(),3000)\\\" && electron .\"",
     "api:publish:win": "cd ../MailBridge.API && dotnet publish -c Release -r win-x64 --self-contained -o ../desktop/api/publish",
-    "api:publish:mac": "cd ../MailBridge.API && dotnet publish -c Release -r osx-arm64 --self-contained -o ../desktop/api/publish",
+    "api:publish:mac-arm64": "cd ../MailBridge.API && dotnet publish -c Release -r osx-arm64 --self-contained -o ../desktop/api/publish",
+    "api:publish:mac-x64": "cd ../MailBridge.API && dotnet publish -c Release -r osx-x64 --self-contained -o ../desktop/api/publish",
     "electron:build:next": "cross-env ELECTRON_BUILD=true next build",
     "icon-gen": "node scripts/generate-icons.mjs",
     "electron:build:main": "tsc -p electron/tsconfig.json",
-    "electron:build:win": "npm run api:publish:win && npm run electron:build:next && npm run electron:build:main && electron-builder --win",
-    "electron:build:mac": "npm run api:publish:mac && npm run electron:build:next && npm run electron:build:main && electron-builder --mac"
+    "electron:build:win": "npm run api:publish:win && npm run electron:build:next && npm run electron:build:main && electron-builder --win --x64",
+    "electron:build:mac-arm64": "npm run api:publish:mac-arm64 && npm run electron:build:next && npm run electron:build:main && electron-builder --mac --arm64",
+    "electron:build:mac-x64": "npm run api:publish:mac-x64 && npm run electron:build:next && npm run electron:build:main && electron-builder --mac --x64"
   },
   "dependencies": {
     "@base-ui-components/react": "^1.0.0-rc.0",

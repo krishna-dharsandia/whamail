@@ -4,6 +4,9 @@ on:
   push:
     tags: ["v*"]
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -35,37 +38,71 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: |
-            desktop/release/Whamail-x64.exe
-            desktop/release/Whamail-ia32.exe
+          files: desktop/release/Whamail-Setup-*-x64.exe
           generate_release_notes: true
 
-  build-mac:
-    needs: [build-windows]
+  build-mac-arm64:
     runs-on: macos-latest
     timeout-minutes: 30
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: desktop/package-lock.json
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0"
+
       - run: npm ci
         working-directory: desktop
+
       - run: npm run icon-gen
         working-directory: desktop
-      - run: npm run electron:build:mac
+
+      - run: npm run electron:build:mac-arm64
         working-directory: desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: softprops/action-gh-release@v2
         with:
-          files: |
-            desktop/release/Whamail-*-arm64.dmg
-            desktop/release/Whamail-*-x64.dmg
+          files: desktop/release/Whamail-*-arm64.dmg
+          generate_release_notes: true
+
+  build-mac-x64:
+    runs-on: macos-13
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0"
+
+      - run: npm ci
+        working-directory: desktop
+
+      - run: npm run icon-gen
+        working-directory: desktop
+
+      - run: npm run electron:build:mac-x64
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: desktop/release/Whamail-*-x64.dmg
           generate_release_notes: true
