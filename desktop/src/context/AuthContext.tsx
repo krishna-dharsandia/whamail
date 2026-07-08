@@ -1,8 +1,15 @@
 "use client";
-import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, ReactNode, useCallback } from "react";
 import { createSupabaseClient } from "@/lib/supabase";
 import { authApi } from "@/lib/api";
-import type { User, Session } from "@supabase/supabase-js";
+import type { User, Session, SupabaseClient } from "@supabase/supabase-js";
+
+let supabaseInstance: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient | null {
+  if (typeof window === "undefined") return null;
+  if (!supabaseInstance) supabaseInstance = createSupabaseClient();
+  return supabaseInstance;
+}
 
 interface AppUser {
     id: string;
@@ -29,14 +36,14 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const supabase = useRef(createSupabaseClient()).current;
     const [user, setUser] = useState<AppUser | null>(null);
     const [supabaseUser, setSupabaseUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        const sb = getSupabase()!;
+        sb.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
             setSupabaseUser(session?.user ?? null);
             if (session?.user) {
@@ -46,8 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
         });
 
-        // Listen for auth state changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = sb.auth.onAuthStateChange((_event, session) => {
             setSession(session);
             setSupabaseUser(session?.user ?? null);
             if (session?.user) {
@@ -61,7 +67,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return () => subscription.unsubscribe();
     }, []);
 
-    const syncProfile = async (sbUser: User) => {
+    const syncProfile = useCallback(async (sbUser: User) => {
         try {
             const provider = sbUser.app_metadata?.provider || "email";
             const metadata = sbUser.user_metadata || {};
@@ -73,37 +79,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser(res.data);
         } catch (err) {
             console.error("Failed to sync profile:", err);
-            // If backend fails, still allow user to see the app
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    const signInWithGoogle = async () => {
-        const { error } = await supabase.auth.signInWithOAuth({
+    const signInWithGoogle = useCallback(async () => {
+        const sb = getSupabase()!;
+        const { error } = await sb.auth.signInWithOAuth({
             provider: "google",
             options: {
                 redirectTo: `${window.location.origin}/auth/callback`,
             },
         });
         if (error) throw error;
-    };
+    }, []);
 
-    const logout = async () => {
-        await supabase.auth.signOut();
+    const logout = useCallback(async () => {
+        await getSupabase()!.auth.signOut();
         setUser(null);
         setSession(null);
         setSupabaseUser(null);
-    };
+    }, []);
 
-    const refreshProfile = async () => {
+    const refreshProfile = useCallback(async () => {
         try {
             const res = await authApi.profile();
             setUser(res.data);
         } catch (err) {
             console.error("Failed to refresh profile:", err);
         }
-    };
+    }, []);
 
     return (
         <AuthContext.Provider value={{
