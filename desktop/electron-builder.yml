@@ -4,7 +4,7 @@ executableName: Whamail
 copyright: Copyright © 2026 Whamail
 
 directories:
-  output: release
+  output: release/build
   buildResources: build
 
 files:
@@ -26,7 +26,6 @@ win:
     - target: portable
       arch:
         - x64
-        - ia32
   artifactName: Whamail-${arch}.exe
   icon: build/icon.png
 

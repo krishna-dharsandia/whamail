@@ -5,6 +5,7 @@ const nextConfig = {
   ...(isElectron && {
     output: "export",
     trailingSlash: true,
+    assetPrefix: "./",
     images: { unoptimized: true },
     skipMiddlewareUrlNormalize: true,
   }),
