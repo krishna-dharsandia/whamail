@@ -1,0 +1,38 @@
+# Node
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+
+# Electron
+dist-electron/
+release/
+api/publish/
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+.idea/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated icons (run npm run icon-gen to regenerate)
+build/
+!build/.gitkeep
+
+# IDE
+*.swp
+*.swo

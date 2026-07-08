@@ -1,0 +1,17 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+## Rider
+.idea/
+
+## Environment
+.env
+.env.*
+!.env.example
+
+## Logs
+*.log
