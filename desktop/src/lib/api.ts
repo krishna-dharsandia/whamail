@@ -1,5 +1,11 @@
 import axios from "axios";
-import { supabase } from "./supabase";
+import { createSupabaseClient } from "./supabase";
+
+let _supabase: ReturnType<typeof createSupabaseClient> | null = null;
+function getSupabase() {
+  if (!_supabase) _supabase = createSupabaseClient();
+  return _supabase;
+}
 import { resolveApiUrl } from "@/hooks/use-desktop";
 
 let cachedBaseUrl: string | null = null;
@@ -21,7 +27,7 @@ async function createClient() {
 
   // Attach Supabase JWT token on every request
   instance.interceptors.request.use(async (config) => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await getSupabase().auth.getSession();
     if (session?.access_token) {
       config.headers.Authorization = `Bearer ${session.access_token}`;
     }
