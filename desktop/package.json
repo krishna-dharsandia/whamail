@@ -1,7 +1,7 @@
 {
   "name": "whamail-desktop",
   "version": "1.0.2",
-  "description": "Email broadcast platform — desktop application",
+  "description": "Whamail",
   "author": "Whamail",
   "homepage": "https://whamail.com",
   "type": "module",

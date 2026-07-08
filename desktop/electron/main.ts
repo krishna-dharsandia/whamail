@@ -25,6 +25,12 @@ function registerAppProtocol() {
     // Remove leading slash on Windows
     if (pathname.startsWith("/")) pathname = pathname.slice(1);
 
+    // _next assets always resolve from root (fixes relative path issues on subpages)
+    const nextIdx = pathname.indexOf("_next/");
+    if (nextIdx > 0) {
+      pathname = pathname.slice(nextIdx);
+    }
+
     // Default to index.html for directory-like paths
     if (!pathname || pathname.endsWith("/")) {
       pathname = join(pathname, "index.html");
@@ -44,6 +50,24 @@ function registerAppProtocol() {
   });
 }
 
+function handleDeepLink(url: string) {
+  // whamail://auth/callback?code=xxx
+  // URL parses as: hostname=auth, pathname=/callback
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname === "auth" && parsed.pathname === "/callback") {
+      const code = parsed.searchParams.get("code");
+      if (code && mainWindow) {
+        mainWindow.webContents.send("auth-callback", code);
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    }
+  } catch {
+    console.error("Invalid deep link:", url);
+  }
+}
+
 protocol.registerSchemesAsPrivileged([
   { scheme: PROTOCOL, privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ]);
@@ -55,7 +79,19 @@ async function start() {
     return;
   }
 
-  app.on("second-instance", () => {
+  // Register as handler for whamail:// deep links
+  if (process.defaultApp) {
+    app.setAsDefaultProtocolClient("whamail", process.execPath, [app.getAppPath()]);
+  } else {
+    app.setAsDefaultProtocolClient("whamail");
+  }
+
+  app.on("second-instance", (_event, argv) => {
+    // On Windows, deep link URL comes as last argv
+    const deepLink = argv.find((arg) => arg.startsWith("whamail://"));
+    if (deepLink) {
+      handleDeepLink(deepLink);
+    }
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
@@ -63,7 +99,15 @@ async function start() {
     }
   });
 
+  // macOS deep link
+  app.on("open-url", (_event, url) => {
+    handleDeepLink(url);
+  });
+
   // IPC handlers
+  ipcMain.handle("open-external-auth", (_event, url: string) => {
+    shell.openExternal(url);
+  });
   ipcMain.on("show-notification", (_, { title, body }: { title: string; body: string }) => {
     new Notification({ title, body }).show();
   });
@@ -144,10 +188,11 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.loadURL("http://localhost:3000");
-    mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadURL(`${PROTOCOL}://./index.html`);
   }
+
+  mainWindow.webContents.openDevTools();
 
   mainWindow.once("ready-to-show", () => {
     mainWindow?.show();

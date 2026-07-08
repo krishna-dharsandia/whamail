@@ -92,7 +92,8 @@ builder.Services.AddCors(options =>
         policy.WithOrigins(
                 "http://localhost:3000",
                 "http://localhost:3001",
-                "https://mail-mesh.vercel.app"
+                "https://mail-mesh.vercel.app",
+                "app://."
             )
             .AllowAnyHeader()
             .AllowAnyMethod()
