@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseClient } from "@/lib/supabase";
 
 function CallbackHandler() {
   const router = useRouter();
@@ -18,7 +18,7 @@ function CallbackHandler() {
       return;
     }
 
-    supabase.auth
+    createSupabaseClient().auth
       .exchangeCodeForSession(code)
       .then(({ error }) => {
         if (error) {
