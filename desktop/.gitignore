@@ -38,4 +38,5 @@ next-env.d.ts
 # electron
 /dist-electron
 /release
+/dist
 /api/publish
