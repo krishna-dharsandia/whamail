@@ -110,17 +110,23 @@
     </div>
 
     <div class="footer">
-      <a href="https://github.com/krishna-dharsandia/whamail-desktop/releases">View all releases on GitHub</a>
+      <a href="https://github.com/krishna-dharsandia/whamail/releases">View all releases on GitHub</a>
     </div>
   </div>
 
   <script>
     // ─── Auto-detect latest version from GitHub API ───
-    const REPO = "krishna-dharsandia/whamail-desktop";
+    const REPO = "krishna-dharsandia/whamail";
 
     async function load() {
       try {
         const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`);
+        if (res.status === 404) {
+          document.getElementById("loading").style.display = "none";
+          document.getElementById("error").textContent = "No release published yet. Check back soon.";
+          document.getElementById("error").style.display = "block";
+          return;
+        }
         if (!res.ok) throw new Error(`GitHub API returned ${res.status}`);
         const release = await res.json();
         const tag = release.tag_name;           // e.g. "v1.0.1"
@@ -128,7 +134,6 @@
 
         document.getElementById("ver").textContent = ver;
 
-        // Build download URLs — GitHub auto-redirects /latest/ to the tag
         const base = `https://github.com/${REPO}/releases/latest/download/Whamail.Setup.${ver}.exe`;
         const macArm = `https://github.com/${REPO}/releases/latest/download/Whamail-${ver}-arm64.dmg`;
         const macX64 = `https://github.com/${REPO}/releases/latest/download/Whamail-${ver}-x64.dmg`;
@@ -141,9 +146,8 @@
         document.getElementById("buttons").style.display = "block";
       } catch (err) {
         document.getElementById("loading").style.display = "none";
-        const el = document.getElementById("error");
-        el.textContent = "Could not fetch latest version. " + err.message;
-        el.style.display = "block";
+        document.getElementById("error").textContent = "Could not fetch latest version. " + err.message;
+        document.getElementById("error").style.display = "block";
       }
     }
 
