@@ -1,6 +1,7 @@
-import { app, BrowserWindow, shell, Menu, Tray, nativeImage, Notification, ipcMain, nativeTheme } from "electron";
+import { app, BrowserWindow, shell, Menu, Tray, nativeImage, Notification, ipcMain, nativeTheme, protocol, net } from "electron";
 import { join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { existsSync } from "node:fs";
 import { launchApi, killApi, ApiProcessResult } from "./api-process.js";
 import { ChildProcess } from "node:child_process";
 
@@ -12,6 +13,40 @@ let tray: Tray | null = null;
 let apiProcess: ChildProcess | null = null;
 let apiUrl = "";
 let isQuitting = false;
+
+const PROTOCOL = "app";
+const OUT_DIR = join(__dirname, "..", "out");
+
+function registerAppProtocol() {
+  protocol.handle(PROTOCOL, (request) => {
+    const url = new URL(request.url);
+    let pathname = decodeURIComponent(url.pathname);
+
+    // Remove leading slash on Windows
+    if (pathname.startsWith("/")) pathname = pathname.slice(1);
+
+    // Default to index.html for directory-like paths
+    if (!pathname || pathname.endsWith("/")) {
+      pathname = join(pathname, "index.html");
+    }
+
+    let filePath = join(OUT_DIR, pathname);
+
+    // If file doesn't exist, try adding /index.html (Next.js trailingSlash)
+    if (!existsSync(filePath)) {
+      const withIndex = join(OUT_DIR, pathname, "index.html");
+      if (existsSync(withIndex)) {
+        filePath = withIndex;
+      }
+    }
+
+    return net.fetch(pathToFileURL(filePath).toString());
+  });
+}
+
+protocol.registerSchemesAsPrivileged([
+  { scheme: PROTOCOL, privileges: { standard: true, secure: true, supportFetchAPI: true } },
+]);
 
 async function start() {
   const gotLock = app.requestSingleInstanceLock();
@@ -62,6 +97,7 @@ async function start() {
   }
 
   await app.whenReady();
+  registerAppProtocol();
   createMenu();
   createWindow();
   createTray();
@@ -110,7 +146,7 @@ function createWindow() {
     mainWindow.loadURL("http://localhost:3000");
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(join(__dirname, "..", "out", "index.html"));
+    mainWindow.loadURL(`${PROTOCOL}://./index.html`);
   }
 
   mainWindow.once("ready-to-show", () => {
