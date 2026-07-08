@@ -1,7 +1,6 @@
 appId: app.whamail.desktop
 productName: Whamail
 copyright: Copyright © 2026 Whamail
-license: LICENSE.txt
 
 directories:
   output: release
