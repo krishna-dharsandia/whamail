@@ -1,0 +1,67 @@
+appId: app.whamail.desktop
+productName: Whamail
+copyright: Copyright © 2026 Whamail
+license: LICENSE.txt
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist-electron/**/*
+  - out/**/*
+  - package.json
+  - public/**/*
+
+extraResources:
+  - from: api/publish
+    to: api
+    filter:
+      - "**/*"
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: Whamail.Setup.${version}.${ext}
+  icon: build/icon.png
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Whamail
+  license: LICENSE.txt
+  runAfterFinish: true
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+  artifactName: Whamail-${version}-${arch}.${ext}
+  category: public.app-category.productivity
+  hardenedRuntime: true
+  icon: build/icon.png
+
+dmg:
+  title: Whamail ${version}
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  category: Network
+  icon: build/icons
