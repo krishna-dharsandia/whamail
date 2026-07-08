@@ -64,7 +64,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
         });
 
-        return () => subscription.unsubscribe();
+        // Listen for deep link auth callback from Electron
+        const electronAPI = (window as any).electronAPI;
+        let removeAuthListener: (() => void) | undefined;
+        if (electronAPI?.onAuthCallback) {
+            removeAuthListener = electronAPI.onAuthCallback(async (code: string) => {
+                try {
+                    const { data, error } = await sb.auth.exchangeCodeForSession(code);
+                    if (error) {
+                        console.error("Auth callback error:", error.message);
+                        alert(`Sign-in failed: ${error.message}`);
+                    } else {
+                        console.log("Auth exchange success, session:", !!data.session);
+                    }
+                } catch (err) {
+                    console.error("Failed to exchange code:", err);
+                    alert(`Sign-in error: ${err}`);
+                }
+            });
+        }
+
+        return () => {
+            subscription.unsubscribe();
+            removeAuthListener?.();
+        };
     }, []);
 
     const syncProfile = useCallback(async (sbUser: User) => {
@@ -86,13 +109,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const signInWithGoogle = useCallback(async () => {
         const sb = getSupabase()!;
-        const { error } = await sb.auth.signInWithOAuth({
-            provider: "google",
-            options: {
-                redirectTo: `${window.location.origin}/auth/callback`,
-            },
-        });
-        if (error) throw error;
+        const isDesktop = !!(window as any).electronAPI?.isDesktop;
+
+        if (isDesktop) {
+            // Open OAuth in external browser (uses existing Chrome session)
+            // Redirect back to app via whamail:// deep link
+            const { data, error } = await sb.auth.signInWithOAuth({
+                provider: "google",
+                options: {
+                    redirectTo: "whamail://auth/callback",
+                    skipBrowserRedirect: true,
+                },
+            });
+            if (error) throw error;
+            if (data.url) {
+                (window as any).electronAPI.openExternalAuth(data.url);
+            }
+        } else {
+            const { error } = await sb.auth.signInWithOAuth({
+                provider: "google",
+                options: {
+                    redirectTo: `${window.location.origin}/auth/callback`,
+                },
+            });
+            if (error) throw error;
+        }
     }, []);
 
     const logout = useCallback(async () => {

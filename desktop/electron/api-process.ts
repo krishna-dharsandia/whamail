@@ -124,7 +124,7 @@ export async function launchApi(): Promise<ApiProcessResult> {
   await waitForApi(apiUrl);
   console.log(`[API] Ready at ${apiUrl}`);
 
-  return { process: apiProcess, port, url: apiUrl };
+  return { process: apiProcess, port, url: `${apiUrl}/api` };
 }
 
 /**
