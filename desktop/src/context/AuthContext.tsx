@@ -73,13 +73,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     const { data, error } = await sb.auth.exchangeCodeForSession(code);
                     if (error) {
                         console.error("Auth callback error:", error.message);
-                        alert(`Sign-in failed: ${error.message}`);
-                    } else {
-                        console.log("Auth exchange success, session:", !!data.session);
                     }
                 } catch (err) {
                     console.error("Failed to exchange code:", err);
-                    alert(`Sign-in error: ${err}`);
                 }
             });
         }

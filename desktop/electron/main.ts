@@ -188,11 +188,10 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.loadURL("http://localhost:3000");
+    mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadURL(`${PROTOCOL}://./index.html`);
   }
-
-  mainWindow.webContents.openDevTools();
 
   mainWindow.once("ready-to-show", () => {
     mainWindow?.show();
