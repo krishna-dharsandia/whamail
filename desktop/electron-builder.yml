@@ -19,6 +19,8 @@ extraResources:
     filter:
       - "**/*"
 
+compression: normal
+
 win:
   target:
     - target: portable
