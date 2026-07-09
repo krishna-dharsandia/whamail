@@ -3,8 +3,7 @@ import react from "@astrojs/react";
 import tailwind from "@astrojs/tailwind";
 
 export default defineConfig({
-  site: "https://krishna-dharsandia.github.io",
-  base: "/whamail",
+  site: "https://whamail.xyz",
   output: "static",
   integrations: [
     react(),
