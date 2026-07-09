@@ -2,189 +2,164 @@
   <img src="desktop/build/icon.png" alt="Whamail" width="120" />
 </p>
 
-<h1 align="center">Whamail Desktop</h1>
+<h1 align="center">Whamail</h1>
 
-<p align="center">Desktop email broadcast application built with Electron + Next.js.</p>
+<p align="center">
+  Open-source desktop email broadcast platform.<br/>
+  Built with Electron, Next.js, and .NET.
+</p>
 
-## One-Click Release Pipeline
-
-```
-git tag v1.0.1 && git push origin v1.0.1
-```
-
-That's it. GitHub Actions auto-builds the installer and publishes it.  
-The landing page (GitHub Pages) automatically shows the latest download link.
+<p align="center">
+  <a href="https://github.com/krishna-dharsandia/whamail/releases/latest">
+    <img src="https://img.shields.io/github/v/release/krishna-dharsandia/whamail?style=flat-square" alt="Latest Release" />
+  </a>
+  <a href="https://github.com/krishna-dharsandia/whamail/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/krishna-dharsandia/whamail?style=flat-square" alt="License" />
+  </a>
+  <a href="https://github.com/krishna-dharsandia/whamail/actions/workflows/release.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/krishna-dharsandia/whamail/release.yml?style=flat-square&label=build" alt="Build Status" />
+  </a>
+  <a href="https://github.com/krishna-dharsandia/whamail/releases/latest">
+    <img src="https://img.shields.io/github/downloads/krishna-dharsandia/whamail/total?style=flat-square" alt="Downloads" />
+  </a>
+</p>
 
 ---
 
-## Requirements
+## Features
 
-| Dependency | Version | Purpose |
-|---|---|---|
-| [Node.js](https://nodejs.org/) | >= 18 | Next.js frontend & Electron |
-| [npm](https://www.npmjs.com/) | >= 9 | Package management |
-| [.NET SDK](https://dotnet.microsoft.com/download) | >= 8.0 | Backend API |
-| [Git](https://git-scm.com/) | Any | Version control |
+- **Email Broadcasts** — Send bulk emails to your audience
+- **Audience Management** — Import, organize, and segment contacts
+- **Template Editor** — Create and reuse email templates
+- **Google OAuth** — Sign in with Google
+- **Metrics & Logs** — Track delivery and engagement
+- **Cross-Platform** — Windows (.exe) and macOS (.dmg)
+- **System Tray** — Runs in background with tray icon
 
-```bash
-node -v       # >= 18
-npm -v        # >= 9
-dotnet --list-sdks  # shows 8.x or higher
+## Download
+
+Get the latest version from the [Releases page](https://github.com/krishna-dharsandia/whamail/releases/latest).
+
+| Platform | Download |
+|----------|----------|
+| Windows (64-bit) | [Whamail-Setup-x64.exe](https://github.com/krishna-dharsandia/whamail/releases/latest) |
+| macOS (Apple Silicon) | [Whamail-arm64.dmg](https://github.com/krishna-dharsandia/whamail/releases/latest) |
+| macOS (Intel) | [Whamail-x64.dmg](https://github.com/krishna-dharsandia/whamail/releases/latest) |
+
+Or visit [whamail.xyz](https://whamail.xyz) for the download page.
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Desktop Shell | [Electron](https://www.electronjs.org/) |
+| Frontend | [Next.js](https://nextjs.org/) + [React](https://react.dev/) + [Tailwind CSS](https://tailwindcss.com/) |
+| UI Components | [shadcn/ui](https://ui.shadcn.com/) |
+| Backend API | [.NET 8](https://dotnet.microsoft.com/) (C#) |
+| Auth & Database | [Supabase](https://supabase.com/) |
+| Installer | [NSIS](https://nsis.sourceforge.io/) (Windows) / DMG (macOS) |
+
+## Project Structure
+
 ```
-
-## Directory Structure
-
-```
-whamail-desktop/              ← Git repo root
-├── .github/workflows/
-│   ├── release.yml           ← Builds installer on git tag push
-│   └── landing.yml           ← Deploys landing page to GitHub Pages
-├── landing/                  ← Download page (GitHub Pages)
-│   └── index.html            ← Auto-detects latest version from GitHub API
-├── desktop/                  ← Next.js + Electron source
-│   ├── electron/
-│   ├── src/
+whamail/
+├── desktop/              # Electron + Next.js app
+│   ├── electron/         # Main process (Electron)
+│   ├── src/              # Next.js frontend (React)
 │   └── package.json
-└── MailBridge.API/           ← .NET API (sibling, same repo)
-    └── MailBridge.API/
-        └── MailBridge.API.csproj
+├── landing/              # Landing page (Astro)
+├── MailBridge.API/       # .NET backend API
+└── .github/workflows/   # CI/CD (GitHub Actions)
 ```
 
 ## Development
 
-### 1. Install dependencies
+### Prerequisites
+
+- [Node.js](https://nodejs.org/) >= 18
+- [.NET SDK](https://dotnet.microsoft.com/download) >= 8.0
+
+### Quick Start
 
 ```bash
+# Clone the repo
+git clone https://github.com/krishna-dharsandia/whamail.git
+cd whamail/desktop
+
+# Install dependencies
 npm install
-```
 
-### 2. Configure environment
-
-```bash
+# Configure environment
 cp .env.example .env.local
 ```
 
-Set your Supabase project credentials in `.env.local`:
+Set your Supabase credentials in `.env.local`:
 
-```
+```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 NEXT_PUBLIC_API_URL=http://localhost:5133/api
 ```
 
-### 3. Run in development mode
-
 ```bash
+# Run in web mode (Next.js + .NET API)
 npm run dev
-```
 
-This starts both Next.js (port 3000) and the .NET API concurrently.
-
-Or run the Electron desktop version:
-
-```bash
+# Run in desktop mode (Electron)
 npm run electron:dev
 ```
 
-This launches Next.js + Electron window with the .NET API running inside.
-
----
-
-## Building the Desktop Installer
-
-### Locally (Windows)
+### Building
 
 ```bash
+# Windows
 npm run electron:build:win
+# Output: dist/Whamail-Setup-1.0.0-x64.exe
+
+# macOS (Apple Silicon)
+npm run electron:build:mac-arm64
+# Output: dist/Whamail-1.0.0-arm64.dmg
+
+# macOS (Intel)
+npm run electron:build:mac-x64
+# Output: dist/Whamail-1.0.0-x64.dmg
 ```
 
-Output: `release/Whamail.Setup.1.0.0.exe`
+## Release Process
 
-### Locally (macOS)
+Push a version tag to trigger automated builds:
 
 ```bash
-npm run electron:build:mac
-```
-
-Output: `release/Whamail-1.0.0-arm64.dmg`
-
----
-
-## CI/CD: Full One-Click Pipeline
-
-### How it works
-
-```
-You push a tag                   GitHub Actions                    Users
-─────────────                    ─────────────                     ─────
+# Bump version in desktop/package.json, then:
 git tag v1.0.1
 git push origin v1.0.1
-        │
-        ├──► Build Windows .exe ──► GitHub Release
-        │
-        └──► Build macOS .dmg  ──► GitHub Release
-                                      │
-                                      ▼
-                              Landing page (GitHub Pages)
-                              https://krishna-dharsandia.github.io/whamail-desktop/
-                                      │
-                                      ▼
-                              "Download for Windows" / "Download for Mac"
-                              (links auto-update to latest version)
 ```
 
-### Step 1: Set up GitHub Pages
+GitHub Actions builds installers for all platforms and uploads them to the [Releases page](https://github.com/krishna-dharsandia/whamail/releases).
 
-1. Go to repo **Settings → Pages**
-2. Source: **GitHub Actions**
-3. The `landing.yml` workflow will deploy `landing/` automatically
-
-### Step 2: Push a release
-
-```bash
-# Bump version in package.json first
-npm version patch   # or minor, or major
-git push --tags
-```
-
-The `release.yml` workflow will:
-1. Check out the desktop and API source
-2. Run `npm ci` + `npm run icon-gen`
-3. Run `npm run electron:build:win`
-4. Upload `release/*.exe` to the GitHub Release
-
-### Step 3: Users get the download
-
-The landing page at `https://krishna-dharsandia.github.io/whamail-desktop/`  
-auto-fetches the latest release from the GitHub API and shows the download buttons.
-
-Direct download URLs (for embedding elsewhere):
+## Architecture
 
 ```
-https://github.com/krishna-dharsandia/whamail-desktop/releases/latest/download/Whamail.Setup.1.0.0.exe
-https://github.com/krishna-dharsandia/whamail-desktop/releases/latest/download/Whamail-1.0.0-arm64.dmg
-https://github.com/krishna-dharsandia/whamail-desktop/releases/latest/download/Whamail-1.0.0-x64.dmg
+┌─────────────────────────────────────────┐
+│              Electron Shell             │
+│  ┌───────────────┐  ┌───────────────┐  │
+│  │   Next.js UI  │  │  .NET API     │  │
+│  │   (Renderer)  │◄─┤  (Child Proc) │  │
+│  └───────────────┘  └───────┬───────┘  │
+│                             │          │
+│                      ┌──────┴──────┐   │
+│                      │  Supabase   │   │
+│                      │  (Auth/DB)  │   │
+│                      └─────────────┘   │
+└─────────────────────────────────────────┘
 ```
 
-### API Repo in CI
+The .NET API runs as a child process inside Electron, communicating over localhost on a random available port.
 
-The workflow expects the .NET API source at `MailBridge.API/MailBridge.API/`  
-(either in the same repo as a sibling, or checked out via a second `actions/checkout` step).
+## Contributing
 
----
-
-## What's inside the installer
-
-| Component | Source | Destination |
-|---|---|---|
-| Electron app | `out/`, `dist-electron/` | Program Files |
-| .NET API | `api/publish/` | `resources/api/` inside app |
-| Next.js frontend | `out/` | Served by Electron |
-
-The .NET API is spawned as a child process by Electron on startup, runs on a random available port, and is health-checked before the window loads.
-
----
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## License
 
-MIT — see [LICENSE.txt](LICENSE.txt)
+[MIT](LICENSE) — Krishna Dharsandia
