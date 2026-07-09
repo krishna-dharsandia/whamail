@@ -28,9 +28,6 @@ jobs:
       - run: npm ci
         working-directory: desktop
 
-      - run: npm run icon-gen
-        working-directory: desktop
-
       - run: npm run electron:build:win
         working-directory: desktop
         env:
@@ -61,9 +58,6 @@ jobs:
       - run: npm ci
         working-directory: desktop
 
-      - run: npm run icon-gen
-        working-directory: desktop
-
       - run: npm run electron:build:mac-arm64
         working-directory: desktop
         env:
@@ -92,9 +86,6 @@ jobs:
           dotnet-version: "8.0"
 
       - run: npm ci
-        working-directory: desktop
-
-      - run: npm run icon-gen
         working-directory: desktop
 
       - run: npm run electron:build:mac-x64
