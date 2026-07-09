@@ -142,7 +142,7 @@ async function start() {
 
   await app.whenReady();
   registerAppProtocol();
-  createMenu();
+  Menu.setApplicationMenu(null);
   createWindow();
   createTray();
 
@@ -177,7 +177,6 @@ function createWindow() {
     minHeight: 600,
     show: false,
     title: "Whamail",
-    autoHideMenuBar: true,
     icon: join(__dirname, "..", "build", "icon.png"),
     webPreferences: {
       preload: join(__dirname, "preload.js"),
@@ -212,74 +211,6 @@ function createWindow() {
   });
 }
 
-function createMenu() {
-  const template: Electron.MenuItemConstructorOptions[] = [
-    {
-      label: "Whamail",
-      submenu: [
-        {
-          label: "About Whamail",
-          click: () => {
-            const { dialog } = require("electron");
-            dialog.showMessageBox({
-              type: "info",
-              title: "About Whamail",
-              message: "Whamail",
-              detail: `Version ${app.getVersion()}\nEmail broadcast platform`,
-            });
-          },
-        },
-        { type: "separator" },
-        { role: "services" },
-        { type: "separator" },
-        { role: "hide" },
-        { role: "hideOthers" },
-        { role: "unhide" },
-        { type: "separator" },
-        { role: "quit" },
-      ],
-    },
-    {
-      label: "Edit",
-      submenu: [
-        { role: "undo" },
-        { role: "redo" },
-        { type: "separator" },
-        { role: "cut" },
-        { role: "copy" },
-        { role: "paste" },
-        { role: "selectAll" },
-      ],
-    },
-    {
-      label: "View",
-      submenu: [
-        { role: "reload" },
-        { role: "forceReload" },
-        { type: "separator" },
-        { role: "resetZoom" },
-        { role: "zoomIn" },
-        { role: "zoomOut" },
-        { type: "separator" },
-        { role: "togglefullscreen" },
-      ],
-    },
-    {
-      label: "Window",
-      submenu: [
-        { role: "minimize" },
-        { role: "zoom" },
-        { type: "separator" },
-        { role: "front" },
-        { type: "separator" },
-        { role: "window" },
-      ],
-    },
-  ];
-
-  const menu = Menu.buildFromTemplate(template);
-  Menu.setApplicationMenu(menu);
-}
 
 function createTray() {
   // Use 32x32 icon for tray

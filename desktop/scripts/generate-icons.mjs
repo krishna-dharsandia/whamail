@@ -1,153 +1,68 @@
+import sharp from "sharp";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { deflateSync } from "node:zlib";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
+const buildDir = join(root, "build");
+const source = join(buildDir, "ChatGPT Image Jul 10, 2026, 12_11_15 AM.png");
 
-function crc32Table() {
-  const t = new Uint32Array(256);
-  for (let n = 0; n < 256; n++) {
-    let c = n;
-    for (let k = 0; k < 8; k++) {
-      c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    }
-    t[n] = c;
-  }
-  return t;
-}
+mkdirSync(buildDir, { recursive: true });
 
-const crcTable = crc32Table();
+// Generate PNG sizes
+const pngSizes = [16, 24, 32, 48, 64, 128, 256, 512];
+const pngBuffers = {};
 
-function crc32(buf) {
-  let c = 0xffffffff;
-  for (let n = 0; n < buf.length; n++) {
-    c = crcTable[(c ^ buf[n]) & 0xff] ^ (c >>> 8);
-  }
-  return (c ^ 0xffffffff) >>> 0;
-}
-
-function pngChunk(type, data) {
-  const len = Buffer.alloc(4);
-  len.writeUInt32BE(data.length);
-  const typeB = Buffer.from(type, "ascii");
-  const crcBuf = Buffer.concat([typeB, data]);
-  const crc = Buffer.alloc(4);
-  crc.writeUInt32BE(crc32(crcBuf));
-  return Buffer.concat([len, typeB, data, crc]);
-}
-
-function createPng(size) {
-  const width = size;
-  const height = size;
-  const cx = width / 2;
-  const cy = height / 2;
-  const r = width / 2 - 1;
-
-  const pixels = Buffer.alloc(width * height * 4, 0);
-
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const dx = x - cx;
-      const dy = y - cy;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const i = (y * width + x) * 4;
-
-      if (dist <= r) {
-        pixels[i] = 43;
-        pixels[i + 1] = 130;
-        pixels[i + 2] = 217;
-        pixels[i + 3] = 255;
-      } else {
-        pixels[i] = 0;
-        pixels[i + 1] = 0;
-        pixels[i + 2] = 0;
-        pixels[i + 3] = 0;
-      }
-    }
-  }
-
-  const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
-
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8;
-  ihdr[9] = 6;
-  ihdr[10] = 0;
-  ihdr[11] = 0;
-  ihdr[12] = 0;
-
-  const raw = Buffer.alloc(height * (1 + width * 4));
-  for (let y = 0; y < height; y++) {
-    raw[y * (1 + width * 4)] = 0;
-    pixels.copy(raw, y * (1 + width * 4) + 1, y * width * 4, (y + 1) * width * 4);
-  }
-
-  const compressed = deflateSync(raw, { level: 9 });
-  const iend = Buffer.alloc(0);
-
-  return Buffer.concat([
-    signature,
-    pngChunk("IHDR", ihdr),
-    pngChunk("IDAT", compressed),
-    pngChunk("IEND", iend),
-  ]);
-}
-
-mkdirSync(join(root, "build"), { recursive: true });
-
-const sizes = [16, 24, 32, 48, 64, 128, 256];
-
-for (const size of sizes) {
-  const png = createPng(size);
-  writeFileSync(join(root, "build", `icon-${size}px.png`), png);
+for (const size of pngSizes) {
+  const buf = await sharp(source).resize(size, size).png().toBuffer();
+  pngBuffers[size] = buf;
+  writeFileSync(join(buildDir, `icon-${size}px.png`), buf);
   console.log(`build/icon-${size}px.png`);
 }
 
-writeFileSync(join(root, "build", "icon.png"), createPng(512));
+// Main icon.png (512x512)
+writeFileSync(join(buildDir, "icon.png"), pngBuffers[512]);
 console.log("build/icon.png (512x512)");
 
 // Generate .ico (multi-size Windows icon)
-function createIco(pngBuffers) {
-  const count = pngBuffers.length;
+function createIco(entries) {
+  const count = entries.length;
   const headerSize = 6 + count * 16;
   const header = Buffer.alloc(6);
-  header.writeUInt16LE(0, 0);      // reserved
-  header.writeUInt16LE(1, 2);      // type: icon
-  header.writeUInt16LE(count, 4);  // image count
+  header.writeUInt16LE(0, 0);
+  header.writeUInt16LE(1, 2);
+  header.writeUInt16LE(count, 4);
 
-  const entries = [];
+  const dirEntries = [];
   let offset = headerSize;
-  for (const { size, data } of pngBuffers) {
+  for (const { size, data } of entries) {
     const entry = Buffer.alloc(16);
-    entry[0] = size >= 256 ? 0 : size; // width (0 = 256)
-    entry[1] = size >= 256 ? 0 : size; // height
-    entry[2] = 0;  // color palette
-    entry[3] = 0;  // reserved
-    entry.writeUInt16LE(1, 4);         // color planes
-    entry.writeUInt16LE(32, 6);        // bits per pixel
+    entry[0] = size >= 256 ? 0 : size;
+    entry[1] = size >= 256 ? 0 : size;
+    entry[2] = 0;
+    entry[3] = 0;
+    entry.writeUInt16LE(1, 4);
+    entry.writeUInt16LE(32, 6);
     entry.writeUInt32LE(data.length, 8);
     entry.writeUInt32LE(offset, 12);
-    entries.push(entry);
+    dirEntries.push(entry);
     offset += data.length;
   }
 
-  return Buffer.concat([header, ...entries, ...pngBuffers.map(p => p.data)]);
+  return Buffer.concat([header, ...dirEntries, ...entries.map((e) => e.data)]);
 }
 
 const icoSizes = [16, 24, 32, 48, 64, 128, 256];
-const icoPngs = icoSizes.map(size => ({ size, data: createPng(size) }));
-writeFileSync(join(root, "build", "icon.ico"), createIco(icoPngs));
+const icoEntries = icoSizes.map((size) => ({ size, data: pngBuffers[size] }));
+writeFileSync(join(buildDir, "icon.ico"), createIco(icoEntries));
 console.log("build/icon.ico (multi-size)");
 
 // Generate .icns for macOS
-function createIcns(pngBuffers) {
-  // Minimal .icns with PNG data for key sizes
+function createIcns(entries) {
   const typeMap = { 32: "icp4", 64: "icp5", 128: "ic07", 256: "ic08", 512: "ic09" };
   const chunks = [];
-  for (const { size, data } of pngBuffers) {
+  for (const { size, data } of entries) {
     const type = typeMap[size];
     if (!type) continue;
     const chunkHeader = Buffer.alloc(8);
@@ -163,8 +78,8 @@ function createIcns(pngBuffers) {
 }
 
 const icnsSizes = [32, 64, 128, 256, 512];
-const icnsPngs = icnsSizes.map(size => ({ size, data: createPng(size) }));
-writeFileSync(join(root, "build", "icon.icns"), createIcns(icnsPngs));
+const icnsEntries = icnsSizes.map((size) => ({ size, data: pngBuffers[size] }));
+writeFileSync(join(buildDir, "icon.icns"), createIcns(icnsEntries));
 console.log("build/icon.icns (macOS)");
 
-console.log("\nReplace with proper design for production.");
+console.log("\nAll icons generated from source image.");
