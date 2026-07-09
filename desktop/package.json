@@ -4,6 +4,7 @@
   "description": "Whamail",
   "author": "Whamail",
   "homepage": "https://whamail.com",
+  "repository": "github:krishna-dharsandia/whamail",
   "type": "module",
   "private": true,
   "main": "dist-electron/main.js",
