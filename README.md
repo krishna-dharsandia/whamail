@@ -1,6 +1,10 @@
-# Whamail Desktop
+<p align="center">
+  <img src="desktop/build/icon.png" alt="Whamail" width="120" />
+</p>
 
-Desktop email broadcast application built with Electron + Next.js.
+<h1 align="center">Whamail Desktop</h1>
+
+<p align="center">Desktop email broadcast application built with Electron + Next.js.</p>
 
 ## One-Click Release Pipeline
 
