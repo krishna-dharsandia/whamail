@@ -1,4 +1,5 @@
-import { Client, LocalAuth, Message } from "whatsapp-web.js";
+import pkg from "whatsapp-web.js";
+const { Client, LocalAuth } = pkg;
 import qrcode from "qrcode";
 import { BrowserWindow, ipcMain, app } from "electron";
 import path from "path";
@@ -11,7 +12,7 @@ export type WhatsAppStatus =
   | "ready"
   | "error";
 
-let client: Client | null = null;
+let client: InstanceType<typeof Client> | null = null;
 let mainWindow: BrowserWindow | null = null;
 let currentStatus: WhatsAppStatus = "disconnected";
 let lastQrDataUrl: string | null = null;
@@ -79,7 +80,7 @@ export function initWhatsApp(win: BrowserWindow) {
       },
     });
 
-    client.on("qr", async (qr) => {
+    client.on("qr", async (qr: string) => {
       try {
         const dataUrl = await qrcode.toDataURL(qr, { width: 300, margin: 2 });
         emitQr(dataUrl);
@@ -94,7 +95,7 @@ export function initWhatsApp(win: BrowserWindow) {
       emitStatus("authenticated");
     });
 
-    client.on("auth_failure", (msg) => {
+    client.on("auth_failure", (msg: string) => {
       emitStatus("error", `Authentication failed: ${msg}`);
     });
 
@@ -102,7 +103,7 @@ export function initWhatsApp(win: BrowserWindow) {
       emitStatus("ready");
     });
 
-    client.on("disconnected", (reason) => {
+    client.on("disconnected", (reason: string) => {
       emitStatus("disconnected", String(reason));
       client = null;
     });
@@ -132,7 +133,7 @@ export function initWhatsApp(win: BrowserWindow) {
     }
     try {
       const chatId = phone.replace(/[^0-9]/g, "") + "@c.us";
-      const sent: Message = await client.sendMessage(chatId, message);
+      const sent: any = await client.sendMessage(chatId, message);
       return {
         success: true,
         messageId: sent.id._serialized,
@@ -155,7 +156,7 @@ export function initWhatsApp(win: BrowserWindow) {
       const { phone, message } = messages[i];
       try {
         const chatId = phone.replace(/[^0-9]/g, "") + "@c.us";
-        const sent: Message = await client.sendMessage(chatId, message);
+        const sent: any = await client.sendMessage(chatId, message);
         results.push({ phone, success: true, messageId: sent.id._serialized });
       } catch (err: any) {
         results.push({ phone, success: false, error: err.message });
@@ -203,7 +204,7 @@ export function initWhatsApp(win: BrowserWindow) {
     if (!client || currentStatus !== "ready") return [];
     try {
       const chats = await client.getChats();
-      return chats.slice(0, 50).map((c) => ({
+      return chats.slice(0, 50).map((c: any) => ({
         id: c.id._serialized,
         name: c.name,
         isGroup: c.isGroup,
