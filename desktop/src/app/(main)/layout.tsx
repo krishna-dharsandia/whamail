@@ -48,9 +48,7 @@ function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <Link href="/dashboard">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground text-background text-sm font-bold shrink-0">
-                  W
-                </div>
+                <img src="/logo.png" alt="Whamail" className="h-8 w-8 rounded-lg shrink-0" />
                 <span className="font-semibold text-base">Whamail</span>
               </Link>
             </SidebarMenuButton>
