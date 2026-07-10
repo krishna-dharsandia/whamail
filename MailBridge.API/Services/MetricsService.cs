@@ -23,14 +23,25 @@ public class MetricsService : IMetricsService
         var today = DateTime.UtcNow.Date;
         var monthStart = new DateTime(today.Year, today.Month, 1, 0, 0, 0, DateTimeKind.Utc);
 
+        // Email stats
         var sentToday = await _db.EmailQueues
-            .CountAsync(q => q.UserId == userId && q.Status == "Sent" && q.SentAt >= today);
+            .CountAsync(q => q.UserId == userId && q.Status == "Sent" && q.Channel == "email" && q.SentAt >= today);
 
         var sentThisMonth = await _db.EmailQueues
-            .CountAsync(q => q.UserId == userId && q.Status == "Sent" && q.SentAt >= monthStart);
+            .CountAsync(q => q.UserId == userId && q.Status == "Sent" && q.Channel == "email" && q.SentAt >= monthStart);
 
         var sentAllTime = await _db.EmailQueues
-            .CountAsync(q => q.UserId == userId && q.Status == "Sent");
+            .CountAsync(q => q.UserId == userId && q.Status == "Sent" && q.Channel == "email");
+
+        // WhatsApp stats
+        var messagesToday = await _db.EmailQueues
+            .CountAsync(q => q.UserId == userId && q.Status == "Sent" && q.Channel == "whatsapp" && q.SentAt >= today);
+
+        var messagesThisMonth = await _db.EmailQueues
+            .CountAsync(q => q.UserId == userId && q.Status == "Sent" && q.Channel == "whatsapp" && q.SentAt >= monthStart);
+
+        var messagesAllTime = await _db.EmailQueues
+            .CountAsync(q => q.UserId == userId && q.Status == "Sent" && q.Channel == "whatsapp");
 
         var totalAudiences = await _db.Audiences
             .CountAsync(a => a.UserId == userId);
@@ -45,16 +56,24 @@ public class MetricsService : IMetricsService
             .CountAsync(b => b.UserId == userId && b.Status == "Sending");
 
         var pendingEmails = await _db.EmailQueues
-            .CountAsync(q => q.UserId == userId && (q.Status == "Pending" || q.Status == "Sending"));
+            .CountAsync(q => q.UserId == userId && q.Channel == "email" && (q.Status == "Pending" || q.Status == "Sending"));
 
         var failedEmails = await _db.EmailQueues
-            .CountAsync(q => q.UserId == userId && q.Status == "Failed");
+            .CountAsync(q => q.UserId == userId && q.Channel == "email" && q.Status == "Failed");
+
+        var pendingMessages = await _db.EmailQueues
+            .CountAsync(q => q.UserId == userId && q.Channel == "whatsapp" && (q.Status == "Pending" || q.Status == "Sending"));
+
+        var failedMessages = await _db.EmailQueues
+            .CountAsync(q => q.UserId == userId && q.Channel == "whatsapp" && q.Status == "Failed");
 
         return new MetricsOverviewResponse(
             sentToday, sentThisMonth, sentAllTime,
+            messagesToday, messagesThisMonth, messagesAllTime,
             totalAudiences, totalContacts,
             totalBroadcasts, activeBroadcasts,
-            pendingEmails, failedEmails);
+            pendingEmails, failedEmails,
+            pendingMessages, failedMessages);
     }
 
     public async Task<List<DailyEmailStat>> GetEmailsPerDayAsync(Guid userId, int days = 30)

@@ -78,33 +78,36 @@ public class BroadcastService : IBroadcastService
             await _db.SaveChangesAsync();
         }
 
-        // Load queue items for this broadcast, keyed by recipient email
+        // Load queue items for this broadcast, keyed by recipient
         var queueLookup = await _db.EmailQueues
             .Where(q => q.BroadcastId == broadcastId)
             .GroupBy(q => q.Recipient.ToLower())
             .Select(g => new
             {
-                Email = g.Key,
+                Recipient = g.Key,
                 Status = g.First().Status,
                 SentAt = g.Min(q => q.SentAt),
             })
-            .ToDictionaryAsync(x => x.Email, x => x);
+            .ToDictionaryAsync(x => x.Recipient, x => x);
 
         var contacts = (b.Audience?.Contacts ?? new List<Contact>())
             .Select(c =>
             {
-                var key = c.Email.ToLower();
+                var key = (b.Channel == "whatsapp" ? c.PhoneNumber : c.Email)?.ToLower() ?? "";
                 queueLookup.TryGetValue(key, out var q);
                 return new BroadcastContactDto(
-                    c.Email, c.Name,
+                    c.Email, c.PhoneNumber, c.Name,
                     q?.Status,
                     q?.SentAt
                 );
             })
             .ToList();
 
-        var invalidCount = contacts.Count(c => !IsValidEmail(c.Email));
-        var notQueuedCount = contacts.Count(c => c.QueueStatus == null && IsValidEmail(c.Email));
+        var invalidCount = b.Channel == "whatsapp"
+            ? contacts.Count(c => string.IsNullOrEmpty(c.PhoneNumber))
+            : contacts.Count(c => string.IsNullOrEmpty(c.Email) || !IsValidEmail(c.Email ?? ""));
+        var notQueuedCount = contacts.Count(c => c.QueueStatus == null && (
+            b.Channel == "whatsapp" ? !string.IsNullOrEmpty(c.PhoneNumber) : !string.IsNullOrEmpty(c.Email)));
 
         return new BroadcastDetailResponse(
             MapToResponse(b),
@@ -137,6 +140,7 @@ public class BroadcastService : IBroadcastService
             TemplateId = request.TemplateId,
             Name = request.Name.Trim(),
             SubjectOverride = request.SubjectOverride?.Trim(),
+            Channel = request.Channel,
             Status = "Draft",
             CreatedAt = DateTime.UtcNow,
         };
@@ -166,31 +170,53 @@ public class BroadcastService : IBroadcastService
         if (contacts.Count == 0)
             throw new InvalidOperationException("Audience has no contacts.");
 
-        // Check credentials exist
-        var hasCredentials = await _db.UserCredentials.AnyAsync(c => c.UserId == userId);
-        if (!hasCredentials)
-            throw new InvalidOperationException("Gmail credentials not configured. Go to Settings first.");
+        // For email broadcasts, check credentials exist
+        if (broadcast.Channel == "email")
+        {
+            var hasCredentials = await _db.UserCredentials.AnyAsync(c => c.UserId == userId);
+            if (!hasCredentials)
+                throw new InvalidOperationException("Gmail credentials not configured. Go to Settings first.");
+        }
+
+        // For WhatsApp broadcasts, check session exists
+        if (broadcast.Channel == "whatsapp")
+        {
+            var hasSession = await _db.WhatsAppSessions.AnyAsync(s => s.UserId == userId && s.IsActive);
+            if (!hasSession)
+                throw new InvalidOperationException("WhatsApp is not connected. Go to WhatsApp page first.");
+        }
 
         var subject = broadcast.SubjectOverride ?? broadcast.Template?.SubjectTemplate ?? "No Subject";
 
-        // Enqueue all emails for this broadcast
-        var emailRequests = contacts.Select(c => new QueueEmailRequest(
-            Recipient: c.Email,
+        // Filter contacts based on channel
+        var validContacts = broadcast.Channel == "whatsapp"
+            ? contacts.Where(c => !string.IsNullOrEmpty(c.PhoneNumber)).ToList()
+            : contacts.Where(c => !string.IsNullOrEmpty(c.Email) && IsValidEmail(c.Email)).ToList();
+
+        if (validContacts.Count == 0)
+            throw new InvalidOperationException($"No valid contacts for {broadcast.Channel} broadcast.");
+
+        // Enqueue all messages for this broadcast
+        var emailRequests = validContacts.Select(c => new QueueEmailRequest(
+            Recipient: broadcast.Channel == "whatsapp" ? c.PhoneNumber! : c.Email!,
             TemplateId: broadcast.TemplateId,
-            Subject: subject,
-            Body: null, // template body will be resolved by queue service
+            Subject: broadcast.Channel == "whatsapp" ? "" : subject,
+            Body: null,
             MergeData: new Dictionary<string, string>
             {
-                { "name", c.Name ?? c.Email },
-                { "email", c.Email },
-            }
+                { "name", c.Name ?? c.Email ?? c.PhoneNumber ?? "User" },
+                { "email", c.Email ?? "" },
+                { "phone", c.PhoneNumber ?? "" },
+            },
+            PhoneNumber: c.PhoneNumber,
+            Channel: broadcast.Channel
         )).ToList();
 
         // Enqueue and link to broadcast
         await _queueService.EnqueueForBroadcastAsync(userId, broadcastId, emailRequests);
 
         broadcast.Status = "Sending";
-        broadcast.TotalRecipients = contacts.Count;
+        broadcast.TotalRecipients = validContacts.Count;
         broadcast.SentAt = DateTime.UtcNow;
 
         await _db.SaveChangesAsync();
@@ -210,43 +236,60 @@ public class BroadcastService : IBroadcastService
         if (broadcast.Status != "Completed" && broadcast.Status != "Draft" && broadcast.Status != "Sending")
             throw new InvalidOperationException("Cannot send remaining for this broadcast status.");
 
-        // Find which recipient emails are already in the queue
-        var existingEmails = await _db.EmailQueues
+        // Find which recipients are already in the queue
+        var existingRecipients = await _db.EmailQueues
             .Where(q => q.BroadcastId == broadcastId)
             .Select(q => q.Recipient.ToLower())
             .Distinct()
             .ToListAsync();
-        var existingSet = new HashSet<string>(existingEmails);
+        var existingSet = new HashSet<string>(existingRecipients);
 
         var contacts = (broadcast.Audience?.Contacts ?? new List<Contact>())
-            .Where(c => !existingSet.Contains(c.Email.ToLower()) && IsValidEmail(c.Email))
+            .Where(c =>
+            {
+                if (broadcast.Channel == "whatsapp")
+                    return !string.IsNullOrEmpty(c.PhoneNumber) && !existingSet.Contains(c.PhoneNumber.ToLower());
+                return !string.IsNullOrEmpty(c.Email) && IsValidEmail(c.Email) && !existingSet.Contains(c.Email.ToLower());
+            })
             .ToList();
 
         if (contacts.Count == 0)
             throw new InvalidOperationException("No remaining contacts to send to.");
 
-        // Check credentials exist
-        var hasCredentials = await _db.UserCredentials.AnyAsync(c => c.UserId == userId);
-        if (!hasCredentials)
-            throw new InvalidOperationException("Gmail credentials not configured. Go to Settings first.");
+        // Check credentials/session
+        if (broadcast.Channel == "email")
+        {
+            var hasCredentials = await _db.UserCredentials.AnyAsync(c => c.UserId == userId);
+            if (!hasCredentials)
+                throw new InvalidOperationException("Gmail credentials not configured. Go to Settings first.");
+        }
+
+        if (broadcast.Channel == "whatsapp")
+        {
+            var hasSession = await _db.WhatsAppSessions.AnyAsync(s => s.UserId == userId && s.IsActive);
+            if (!hasSession)
+                throw new InvalidOperationException("WhatsApp is not connected. Go to WhatsApp page first.");
+        }
 
         var subject = broadcast.SubjectOverride ?? broadcast.Template?.SubjectTemplate ?? "No Subject";
 
         var emailRequests = contacts.Select(c => new QueueEmailRequest(
-            Recipient: c.Email,
+            Recipient: broadcast.Channel == "whatsapp" ? c.PhoneNumber! : c.Email!,
             TemplateId: broadcast.TemplateId,
-            Subject: subject,
+            Subject: broadcast.Channel == "whatsapp" ? "" : subject,
             Body: null,
             MergeData: new Dictionary<string, string>
             {
-                { "name", c.Name ?? c.Email },
-                { "email", c.Email },
-            }
+                { "name", c.Name ?? c.Email ?? c.PhoneNumber ?? "User" },
+                { "email", c.Email ?? "" },
+                { "phone", c.PhoneNumber ?? "" },
+            },
+            PhoneNumber: c.PhoneNumber,
+            Channel: broadcast.Channel
         )).ToList();
 
         await _queueService.EnqueueForBroadcastAsync(userId, broadcastId, emailRequests);
 
-        // Update counts
         broadcast.TotalRecipients += contacts.Count;
         if (broadcast.Status == "Draft" || broadcast.Status == "Completed")
         {
@@ -296,7 +339,7 @@ public class BroadcastService : IBroadcastService
     }
 
     private static BroadcastResponse MapToResponse(Broadcast b) => new(
-        b.Id, b.Name, b.Status,
+        b.Id, b.Name, b.Status, b.Channel,
         b.AudienceId, b.Audience?.Name ?? "",
         b.TemplateId, b.Template?.Name ?? "",
         b.SubjectOverride,

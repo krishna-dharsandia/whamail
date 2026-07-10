@@ -4,25 +4,32 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
-  BarChart2, Loader2, Mail, Megaphone, Plus, Send, Users,
+  BarChart2, Loader2, Mail, Megaphone, Plus, Send, Users, MessageCircle,
 } from "lucide-react";
 
 import { broadcastApi, metricsApi } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useWhatsApp } from "@/hooks/use-whatsapp";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 
 interface Overview {
   sentToday: number;
   sentThisMonth: number;
   sentAllTime: number;
+  messagesToday: number;
+  messagesThisMonth: number;
+  messagesAllTime: number;
   totalAudiences: number;
   totalContacts: number;
   totalBroadcasts: number;
   activeBroadcasts: number;
   pendingEmails: number;
   failedEmails: number;
+  pendingMessages: number;
+  failedMessages: number;
 }
 
 interface Broadcast {
@@ -46,6 +53,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { status: waStatus, info: waInfo } = useWhatsApp();
   const [overview, setOverview] = useState<Overview | null>(null);
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,7 +103,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Send className="h-4 w-4" /> Sent Today
+              <Send className="h-4 w-4" /> Emails Sent Today
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -106,11 +114,11 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Mail className="h-4 w-4" /> Sent This Month
+              <MessageCircle className="h-4 w-4" /> Messages Sent Today
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">{overview?.sentThisMonth.toLocaleString() ?? 0}</div>
+            <div className="text-3xl font-bold">{overview?.messagesToday.toLocaleString() ?? 0}</div>
           </CardContent>
         </Card>
 
@@ -139,6 +147,46 @@ export default function DashboardPage() {
                 {overview!.activeBroadcasts} sending now
               </p>
             )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Connection Status */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Mail className="h-4 w-4" /> Gmail
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-green-500" />
+              <span className="text-sm">Connected</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <MessageCircle className="h-4 w-4" /> WhatsApp
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`h-2 w-2 rounded-full ${waStatus === "ready" ? "bg-green-500" : "bg-red-500"}`} />
+                <span className="text-sm">
+                  {waStatus === "ready" ? `Connected as ${waInfo?.name ?? "Unknown"}` : "Not connected"}
+                </span>
+              </div>
+              {waStatus !== "ready" && (
+                <Button asChild size="sm" variant="outline">
+                  <Link href="/whatsapp">Connect</Link>
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>

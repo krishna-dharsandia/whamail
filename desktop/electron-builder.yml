@@ -39,10 +39,9 @@ win:
         - x64
   artifactName: Whamail-Setup-${version}-${arch}.exe
   icon: build/icon.png
-  # SignPath.io will sign via CI — no local cert needed
-  signingHashAlgorithms:
-    - sha256
+  publisherName: Whamail
   verifyUpdateCodeSignature: false
+  requestedExecutionLevel: asInvoker
 
 nsis:
   oneClick: false

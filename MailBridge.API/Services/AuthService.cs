@@ -62,7 +62,7 @@ public class AuthService : IAuthService
         }
 
         var limit = user.Role == "workspace" ? 5000 : 500;
-        return new UserProfileDto(user.Id, user.Email, user.FullName, user.Role, user.EmailsSent, limit, user.EmailVerified, user.AvatarUrl, user.AuthProvider);
+        return new UserProfileDto(user.Id, user.Email, user.FullName, user.Role, user.EmailsSent, user.MessagesSent, limit, user.EmailVerified, user.AvatarUrl, user.AuthProvider);
     }
 
     public async Task<UserProfileDto> GetProfileAsync(Guid userId)
@@ -72,6 +72,6 @@ public class AuthService : IAuthService
             throw new InvalidOperationException("User not found.");
 
         var limit = user.Role == "workspace" ? 5000 : 500;
-        return new UserProfileDto(user.Id, user.Email, user.FullName, user.Role, user.EmailsSent, limit, user.EmailVerified, user.AvatarUrl, user.AuthProvider);
+        return new UserProfileDto(user.Id, user.Email, user.FullName, user.Role, user.EmailsSent, user.MessagesSent, limit, user.EmailVerified, user.AvatarUrl, user.AuthProvider);
     }
 }

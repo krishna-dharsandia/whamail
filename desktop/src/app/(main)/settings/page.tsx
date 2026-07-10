@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
-import { Eye, EyeOff, Loader2, Mail, Save, Trash2, Wifi } from "lucide-react";
+import { Eye, EyeOff, Loader2, Mail, Save, Trash2, Wifi, WifiOff, MessageCircle, ExternalLink } from "lucide-react";
 
 import { credentialApi } from "@/lib/api";
+import { useWhatsApp } from "@/hooks/use-whatsapp";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,6 +24,7 @@ interface Credential {
 }
 
 export default function SettingsPage() {
+  const { status: waStatus, info: waInfo, disconnect: waDisconnect } = useWhatsApp();
   const [credential, setCredential] = useState<Credential | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -278,6 +281,62 @@ export default function SettingsPage() {
           </div>
         </>
       )}
+
+      <Separator />
+
+      <div>
+        <h1 className="text-2xl font-semibold">WhatsApp</h1>
+        <p className="text-muted-foreground text-sm mt-1">Manage your WhatsApp connection for broadcast messaging.</p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <MessageCircle className="h-4 w-4" /> WhatsApp Connection
+          </CardTitle>
+          <CardDescription>
+            Connect your WhatsApp account to send broadcast messages via WhatsApp Web.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {waStatus === "ready" && waInfo ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950 px-4 py-3">
+                <div className="flex items-center gap-2 text-sm text-green-800 dark:text-green-200">
+                  <Wifi className="h-4 w-4" />
+                  <span>Connected as <strong>{waInfo.name}</strong> (+{waInfo.phone})</span>
+                </div>
+                <Badge variant="outline" className="text-green-700 border-green-300 dark:text-green-300">Active</Badge>
+              </div>
+              <div className="flex gap-2">
+                <Button asChild size="sm">
+                  <Link href="/whatsapp">
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Manage Connection
+                  </Link>
+                </Button>
+                <Button variant="outline" size="sm" onClick={async () => { await waDisconnect(); toast.info("WhatsApp disconnected"); }}>
+                  <WifiOff className="h-4 w-4 mr-2" />
+                  Disconnect
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+                <WifiOff className="h-4 w-4" />
+                <span>WhatsApp is not connected. Connect to send WhatsApp broadcasts.</span>
+              </div>
+              <Button asChild size="sm">
+                <Link href="/whatsapp">
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Connect WhatsApp
+                </Link>
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -80,7 +80,7 @@ public class AudienceService : IAudienceService
         return await _db.Contacts
             .Where(c => c.AudienceId == audienceId)
             .OrderByDescending(c => c.CreatedAt)
-            .Select(c => new ContactResponse(c.Id, c.Email, c.Name, c.CreatedAt))
+            .Select(c => new ContactResponse(c.Id, c.Email, c.PhoneNumber, c.Name, c.CreatedAt))
             .ToListAsync();
     }
 
@@ -89,17 +89,36 @@ public class AudienceService : IAudienceService
         var audience = await _db.Audiences.FirstOrDefaultAsync(a => a.Id == audienceId && a.UserId == userId)
             ?? throw new InvalidOperationException("Audience not found.");
 
-        var email = request.Email.Trim().ToLower();
-        if (!IsValidEmail(email)) throw new InvalidOperationException("Invalid email address.");
+        var email = request.Email?.Trim().ToLower();
+        var phone = request.PhoneNumber?.Trim();
 
-        var exists = await _db.Contacts.AnyAsync(c => c.AudienceId == audienceId && c.Email == email);
-        if (exists) throw new InvalidOperationException("Contact already exists in this audience.");
+        if (string.IsNullOrEmpty(email) && string.IsNullOrEmpty(phone))
+            throw new InvalidOperationException("Either email or phone number is required.");
+
+        if (!string.IsNullOrEmpty(email) && !IsValidEmail(email))
+            throw new InvalidOperationException("Invalid email address.");
+
+        if (!string.IsNullOrEmpty(phone) && !IsValidPhone(phone))
+            throw new InvalidOperationException("Invalid phone number. Use format: +<country code><number>");
+
+        // Check for duplicates
+        if (!string.IsNullOrEmpty(email))
+        {
+            var emailExists = await _db.Contacts.AnyAsync(c => c.AudienceId == audienceId && c.Email == email);
+            if (emailExists) throw new InvalidOperationException("Contact with this email already exists in this audience.");
+        }
+        if (!string.IsNullOrEmpty(phone))
+        {
+            var phoneExists = await _db.Contacts.AnyAsync(c => c.AudienceId == audienceId && c.PhoneNumber == phone);
+            if (phoneExists) throw new InvalidOperationException("Contact with this phone number already exists in this audience.");
+        }
 
         var contact = new Contact
         {
             Id = Guid.NewGuid(),
             AudienceId = audienceId,
             Email = email,
+            PhoneNumber = phone,
             Name = request.Name?.Trim(),
             CreatedAt = DateTime.UtcNow,
         };
@@ -107,7 +126,7 @@ public class AudienceService : IAudienceService
         _db.Contacts.Add(contact);
         await _db.SaveChangesAsync();
 
-        return new ContactResponse(contact.Id, contact.Email, contact.Name, contact.CreatedAt);
+        return new ContactResponse(contact.Id, contact.Email, contact.PhoneNumber, contact.Name, contact.CreatedAt);
     }
 
     public async Task DeleteContactAsync(Guid userId, Guid audienceId, Guid contactId)
@@ -138,14 +157,20 @@ public class AudienceService : IAudienceService
         // Skip header row if first line looks like a header
         var startIndex = 0;
         var firstLine = lines[0].ToLower();
-        if (firstLine.Contains("email") || firstLine.Contains("name"))
+        if (firstLine.Contains("email") || firstLine.Contains("name") || firstLine.Contains("phone"))
             startIndex = 1;
 
         var existingEmailsList = await _db.Contacts
-            .Where(c => c.AudienceId == audienceId)
-            .Select(c => c.Email)
+            .Where(c => c.AudienceId == audienceId && c.Email != null)
+            .Select(c => c.Email!)
             .ToListAsync();
         var existingEmails = new HashSet<string>(existingEmailsList);
+
+        var existingPhonesList = await _db.Contacts
+            .Where(c => c.AudienceId == audienceId && c.PhoneNumber != null)
+            .Select(c => c.PhoneNumber!)
+            .ToListAsync();
+        var existingPhones = new HashSet<string>(existingPhonesList);
 
         int added = 0, skipped = 0;
         var newContacts = new List<Contact>();
@@ -153,27 +178,66 @@ public class AudienceService : IAudienceService
         foreach (var line in lines.Skip(startIndex))
         {
             var parts = line.Split(',');
-            var email = parts[0].Trim().ToLower().Trim('"');
-            var name = parts.Length > 1 ? parts[1].Trim().Trim('"') : null;
+            var firstCol = parts[0].Trim().Trim('"');
+            var secondCol = parts.Length > 1 ? parts[1].Trim().Trim('"') : null;
+            var thirdCol = parts.Length > 2 ? parts[2].Trim().Trim('"') : null;
 
-            if (string.IsNullOrEmpty(email) || !IsValidEmail(email))
+            string? email = null;
+            string? phone = null;
+            string? name = null;
+
+            // Detect if first column is email or phone
+            if (IsValidEmail(firstCol))
+            {
+                email = firstCol.ToLower();
+                name = secondCol;
+            }
+            else if (IsValidPhone(firstCol))
+            {
+                phone = firstCol;
+                name = secondCol;
+            }
+            else
+            {
+                // Assume name is first column
+                name = firstCol;
+                if (secondCol != null && IsValidEmail(secondCol))
+                    email = secondCol.ToLower();
+                else if (secondCol != null && IsValidPhone(secondCol))
+                    phone = secondCol;
+                else if (thirdCol != null && IsValidEmail(thirdCol))
+                    email = thirdCol.ToLower();
+                else if (thirdCol != null && IsValidPhone(thirdCol))
+                    phone = thirdCol;
+            }
+
+            if (string.IsNullOrEmpty(email) && string.IsNullOrEmpty(phone))
             {
                 skipped++;
                 continue;
             }
 
-            if (existingEmails.Contains(email))
+            if (!string.IsNullOrEmpty(email) && existingEmails.Contains(email))
             {
                 skipped++;
                 continue;
             }
 
-            existingEmails.Add(email);
+            if (!string.IsNullOrEmpty(phone) && existingPhones.Contains(phone))
+            {
+                skipped++;
+                continue;
+            }
+
+            if (!string.IsNullOrEmpty(email)) existingEmails.Add(email);
+            if (!string.IsNullOrEmpty(phone)) existingPhones.Add(phone);
+
             newContacts.Add(new Contact
             {
                 Id = Guid.NewGuid(),
                 AudienceId = audienceId,
                 Email = email,
+                PhoneNumber = phone,
                 Name = string.IsNullOrEmpty(name) ? null : name,
                 CreatedAt = DateTime.UtcNow,
             });
@@ -192,5 +256,10 @@ public class AudienceService : IAudienceService
     private static bool IsValidEmail(string email)
     {
         return Regex.IsMatch(email, @"^[^@\s]+@[^@\s]+\.[^@\s]+$");
+    }
+
+    private static bool IsValidPhone(string phone)
+    {
+        return Regex.IsMatch(phone, @"^\+[1-9]\d{6,14}$");
     }
 }

@@ -21,6 +21,7 @@ public class MailBridgeDbContext : DbContext
     public DbSet<Audience> Audiences { get; set; }
     public DbSet<Contact> Contacts { get; set; }
     public DbSet<Broadcast> Broadcasts { get; set; }
+    public DbSet<WhatsAppSession> WhatsAppSessions { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -32,6 +33,11 @@ public class MailBridgeDbContext : DbContext
             e.HasOne(u => u.Credential)
              .WithOne(c => c.User)
              .HasForeignKey<UserCredential>(c => c.UserId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(u => u.WhatsAppSession)
+             .WithOne(s => s.User)
+             .HasForeignKey<WhatsAppSession>(s => s.UserId)
              .OnDelete(DeleteBehavior.Cascade);
 
             e.HasMany(u => u.Templates)
@@ -114,14 +120,27 @@ public class MailBridgeDbContext : DbContext
 
         modelBuilder.Entity<Contact>()
             .HasIndex(c => new { c.AudienceId, c.Email })
-            .IsUnique();
+            .IsUnique()
+            .HasFilter(null); // Allow null emails for WhatsApp contacts
+
+        modelBuilder.Entity<Contact>()
+            .HasIndex(c => new { c.AudienceId, c.PhoneNumber })
+            .IsUnique()
+            .HasFilter(null); // Allow null phone numbers for email contacts
 
         modelBuilder.Entity<Broadcast>()
             .HasIndex(b => b.UserId);
 
+        modelBuilder.Entity<WhatsAppSession>()
+            .HasIndex(s => s.UserId)
+            .IsUnique();
+
         // ===== ROW-LEVEL SECURITY: Global Query Filters =====
         modelBuilder.Entity<UserCredential>()
             .HasQueryFilter(c => _currentUserId == null || c.UserId == _currentUserId);
+
+        modelBuilder.Entity<WhatsAppSession>()
+            .HasQueryFilter(s => _currentUserId == null || s.UserId == _currentUserId);
 
         modelBuilder.Entity<EmailTemplate>()
             .HasQueryFilter(t => _currentUserId == null || t.UserId == _currentUserId);

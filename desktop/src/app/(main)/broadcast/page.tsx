@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
-  ChevronLeft, ChevronRight, ExternalLink, Loader2, Megaphone, Plus, Send, Trash2,
+  ChevronLeft, ChevronRight, ExternalLink, Loader2, Megaphone, Plus, Send, Trash2, Mail, MessageCircle,
 } from "lucide-react";
 
 import { useRouter } from "next/navigation";
@@ -26,6 +26,7 @@ interface Broadcast {
   id: string;
   name: string;
   status: string;
+  channel: string;
   audienceId: string;
   audienceName: string;
   templateId: string;
@@ -76,6 +77,7 @@ export default function BroadcastPage() {
 
   const [form, setForm] = useState({
     name: "",
+    channel: "email" as "email" | "whatsapp",
     audienceId: "",
     templateId: "",
     subjectOverride: "",
@@ -105,7 +107,7 @@ export default function BroadcastPage() {
   }
 
   async function openWizard() {
-    setForm({ name: "", audienceId: "", templateId: "", subjectOverride: "" });
+    setForm({ name: "", channel: "email", audienceId: "", templateId: "", subjectOverride: "" });
     setWizardStep(1);
     setWizardOpen(true);
     setLoadingOptions(true);
@@ -128,6 +130,7 @@ export default function BroadcastPage() {
         audienceId: form.audienceId,
         templateId: form.templateId,
         subjectOverride: form.subjectOverride || undefined,
+        channel: form.channel,
       });
       setBroadcasts((prev) => [res.data, ...prev]);
       setWizardOpen(false);
@@ -222,6 +225,13 @@ export default function BroadcastPage() {
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[b.status] ?? ""}`}>
                           {b.status}
                         </span>
+                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                          b.channel === "whatsapp"
+                            ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                            : "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                        }`}>
+                          {b.channel === "whatsapp" ? "WhatsApp" : "Email"}
+                        </span>
                       </div>
                       <p className="text-sm text-muted-foreground mt-0.5">
                         {b.audienceName} · {b.templateName}
@@ -289,7 +299,7 @@ export default function BroadcastPage() {
           <DialogHeader>
             <DialogTitle>New Broadcast</DialogTitle>
             <DialogDescription>
-              Step {wizardStep} of 3 — {wizardStep === 1 ? "Name" : wizardStep === 2 ? "Audience & Template" : "Review"}
+              Step {wizardStep} of 3 — {wizardStep === 1 ? "Channel & Name" : wizardStep === 2 ? "Audience & Template" : "Review"}
             </DialogDescription>
           </DialogHeader>
 
@@ -299,16 +309,49 @@ export default function BroadcastPage() {
             </div>
           ) : (
             <div className="py-2 space-y-4">
-              {/* Step 1: Name */}
+              {/* Step 1: Channel & Name */}
               {wizardStep === 1 && (
-                <div className="space-y-2">
-                  <Label>Broadcast Name</Label>
-                  <Input
-                    autoFocus
-                    placeholder="e.g. March Newsletter"
-                    value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  />
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Channel</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, channel: "email" }))}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors ${
+                          form.channel === "email"
+                            ? "border-primary bg-primary/5"
+                            : "border-muted hover:border-muted-foreground/30"
+                        }`}
+                      >
+                        <Mail className="h-6 w-6" />
+                        <span className="text-sm font-medium">Email</span>
+                        <span className="text-xs text-muted-foreground">Send via Gmail SMTP</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, channel: "whatsapp" }))}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors ${
+                          form.channel === "whatsapp"
+                            ? "border-primary bg-primary/5"
+                            : "border-muted hover:border-muted-foreground/30"
+                        }`}
+                      >
+                        <MessageCircle className="h-6 w-6" />
+                        <span className="text-sm font-medium">WhatsApp</span>
+                        <span className="text-xs text-muted-foreground">Send via WhatsApp Web</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Broadcast Name</Label>
+                    <Input
+                      autoFocus
+                      placeholder={form.channel === "whatsapp" ? "e.g. WhatsApp Campaign" : "e.g. March Newsletter"}
+                      value={form.name}
+                      onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    />
+                  </div>
                 </div>
               )}
 
@@ -353,14 +396,16 @@ export default function BroadcastPage() {
                     )}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label>Subject Override <span className="text-muted-foreground text-xs">(optional)</span></Label>
-                    <Input
-                      placeholder={selectedTemplate?.subjectTemplate ?? "Use template default"}
-                      value={form.subjectOverride}
-                      onChange={(e) => setForm((f) => ({ ...f, subjectOverride: e.target.value }))}
-                    />
-                  </div>
+                  {form.channel === "email" && (
+                    <div className="space-y-2">
+                      <Label>Subject Override <span className="text-muted-foreground text-xs">(optional)</span></Label>
+                      <Input
+                        placeholder={selectedTemplate?.subjectTemplate ?? "Use template default"}
+                        value={form.subjectOverride}
+                        onChange={(e) => setForm((f) => ({ ...f, subjectOverride: e.target.value }))}
+                      />
+                    </div>
+                  )}
                 </>
               )}
 
@@ -372,6 +417,13 @@ export default function BroadcastPage() {
                     <span className="font-medium">{form.name}</span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-muted-foreground">Channel</span>
+                    <span className="flex items-center gap-1">
+                      {form.channel === "whatsapp" ? <MessageCircle className="h-3 w-3" /> : <Mail className="h-3 w-3" />}
+                      {form.channel === "whatsapp" ? "WhatsApp" : "Email"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-muted-foreground">Audience</span>
                     <span>{selectedAudience?.name} ({selectedAudience?.contactCount} contacts)</span>
                   </div>
@@ -379,12 +431,14 @@ export default function BroadcastPage() {
                     <span className="text-muted-foreground">Template</span>
                     <span>{selectedTemplate?.name}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Subject</span>
-                    <span className="text-right max-w-48 truncate">
-                      {form.subjectOverride || selectedTemplate?.subjectTemplate}
-                    </span>
-                  </div>
+                  {form.channel === "email" && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Subject</span>
+                      <span className="text-right max-w-48 truncate">
+                        {form.subjectOverride || selectedTemplate?.subjectTemplate}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

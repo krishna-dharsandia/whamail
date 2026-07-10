@@ -51,6 +51,7 @@ builder.Services.AddScoped<IQueueService, QueueService>();
 builder.Services.AddScoped<IAudienceService, AudienceService>();
 builder.Services.AddScoped<IBroadcastService, BroadcastService>();
 builder.Services.AddScoped<IMetricsService, MetricsService>();
+builder.Services.AddScoped<IWhatsAppService, WhatsAppService>();
 
 // ===== Background Worker =====
 builder.Services.AddHostedService<EmailWorkerService>();

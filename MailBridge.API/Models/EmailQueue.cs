@@ -25,9 +25,16 @@ public class EmailQueue
     public Guid? TemplateId { get; set; }
 
     [Column("recipient")]
-    [Required]
     [MaxLength(255)]
     public string Recipient { get; set; } = string.Empty;
+
+    [Column("phone_number")]
+    [MaxLength(50)]
+    public string? PhoneNumber { get; set; }
+
+    [Column("channel")]
+    [MaxLength(20)]
+    public string Channel { get; set; } = "email"; // "email" or "whatsapp"
 
     [Column("subject")]
     [MaxLength(500)]
@@ -35,6 +42,10 @@ public class EmailQueue
 
     [Column("body")]
     public string Body { get; set; } = string.Empty;
+
+    [Column("media_url")]
+    [MaxLength(500)]
+    public string? MediaUrl { get; set; }
 
     [Column("status")]
     [MaxLength(20)]

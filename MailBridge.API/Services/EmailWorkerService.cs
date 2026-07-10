@@ -46,9 +46,9 @@ public class EmailWorkerService : BackgroundService
         var db = scope.ServiceProvider.GetRequiredService<MailBridgeDbContext>();
         var encryption = scope.ServiceProvider.GetRequiredService<IEncryptionService>();
 
-        // Get batch of pending emails (up to 20 at a time)
+        // Get batch of pending emails (up to 20 at a time) - skip WhatsApp items
         var pendingEmails = await db.EmailQueues
-            .Where(q => q.Status == nameof(EmailStatus.Pending))
+            .Where(q => q.Status == nameof(EmailStatus.Pending) && q.Channel == "email")
             .OrderBy(q => q.CreatedAt)
             .Take(20)
             .ToListAsync(ct);

@@ -28,6 +28,10 @@ public class Broadcast
     [MaxLength(500)]
     public string? SubjectOverride { get; set; }
 
+    [Column("channel")]
+    [MaxLength(20)]
+    public string Channel { get; set; } = "email"; // "email" or "whatsapp"
+
     // Draft | Sending | Completed | Failed
     [Column("status")]
     [MaxLength(50)]

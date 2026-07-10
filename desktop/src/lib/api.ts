@@ -80,7 +80,7 @@ export const audienceApi = {
   create: async (name: string) => (await getApi()).post("/audiences", { name }),
   delete: async (id: string) => (await getApi()).delete(`/audiences/${id}`),
   getContacts: async (id: string) => (await getApi()).get(`/audiences/${id}/contacts`),
-  addContact: async (id: string, data: { email: string; name?: string }) =>
+  addContact: async (id: string, data: { email?: string; phoneNumber?: string; name?: string }) =>
     (await getApi()).post(`/audiences/${id}/contacts`, data),
   deleteContact: async (audienceId: string, contactId: string) =>
     (await getApi()).delete(`/audiences/${audienceId}/contacts/${contactId}`),
@@ -98,11 +98,20 @@ export const broadcastApi = {
   getAll: async () => (await getApi()).get("/broadcasts"),
   getById: async (id: string) => (await getApi()).get(`/broadcasts/${id}`),
   getDetail: async (id: string) => (await getApi()).get(`/broadcasts/${id}/detail`),
-  create: async (data: { name: string; audienceId: string; templateId: string; subjectOverride?: string }) =>
+  create: async (data: { name: string; audienceId: string; templateId: string; subjectOverride?: string; channel?: string }) =>
     (await getApi()).post("/broadcasts", data),
   send: async (id: string) => (await getApi()).post(`/broadcasts/${id}/send`),
   sendRemaining: async (id: string) => (await getApi()).post(`/broadcasts/${id}/send-remaining`),
   delete: async (id: string) => (await getApi()).delete(`/broadcasts/${id}`),
+};
+
+// ===== WhatsApp =====
+export const whatsappApi = {
+  getStatus: async () => (await getApi()).get("/whatsapp/status"),
+  getSession: async () => (await getApi()).get("/whatsapp/session"),
+  saveConnected: async (data: { phoneNumber?: string; pushName?: string; platform?: string }) =>
+    (await getApi()).post("/whatsapp/connected", data),
+  disconnect: async () => (await getApi()).post("/whatsapp/disconnect"),
 };
 
 // ===== Email Queue =====

@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync } from "node:fs";
 import { launchApi, killApi, ApiProcessResult } from "./api-process.js";
 import { initAutoUpdater } from "./updater.js";
+import { initWhatsApp, destroyWhatsApp } from "./whatsapp-client.js";
 import { ChildProcess } from "node:child_process";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
@@ -147,6 +148,10 @@ async function start() {
   createWindow();
   createTray();
 
+  if (mainWindow) {
+    initWhatsApp(mainWindow);
+  }
+
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -162,6 +167,7 @@ async function start() {
 
   app.on("before-quit", () => {
     isQuitting = true;
+    destroyWhatsApp();
     killApi(apiProcess);
     if (tray) {
       tray.destroy();

@@ -37,7 +37,7 @@ public class QueueService : IQueueService
             .OrderByDescending(q => q.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(q => new QueueItemResponse(q.Id, q.Recipient, q.Subject, q.Status, q.ErrorInfo, q.CreatedAt, q.SentAt, q.BroadcastId))
+            .Select(q => new QueueItemResponse(q.Id, q.Recipient, q.PhoneNumber, q.Channel, q.Subject, q.Status, q.ErrorInfo, q.CreatedAt, q.SentAt, q.BroadcastId))
             .ToListAsync();
     }
 
@@ -105,6 +105,8 @@ public class QueueService : IQueueService
                 UserId = userId,
                 TemplateId = email.TemplateId,
                 Recipient = email.Recipient,
+                PhoneNumber = email.PhoneNumber,
+                Channel = email.Channel,
                 Subject = subject,
                 Body = body,
                 Status = nameof(EmailStatus.Pending),
@@ -119,7 +121,7 @@ public class QueueService : IQueueService
         await _db.SaveChangesAsync();
 
         return queueItems.Select(q =>
-            new QueueItemResponse(q.Id, q.Recipient, q.Subject, q.Status, q.ErrorInfo, q.CreatedAt, q.SentAt, q.BroadcastId)
+            new QueueItemResponse(q.Id, q.Recipient, q.PhoneNumber, q.Channel, q.Subject, q.Status, q.ErrorInfo, q.CreatedAt, q.SentAt, q.BroadcastId)
         ).ToList();
     }
 
@@ -158,6 +160,8 @@ public class QueueService : IQueueService
                 BroadcastId = broadcastId,
                 TemplateId = email.TemplateId,
                 Recipient = email.Recipient,
+                PhoneNumber = email.PhoneNumber,
+                Channel = email.Channel,
                 Subject = subject,
                 Body = body,
                 Status = nameof(EmailStatus.Pending),
@@ -170,7 +174,7 @@ public class QueueService : IQueueService
         await _db.SaveChangesAsync();
 
         return queueItems.Select(q =>
-            new QueueItemResponse(q.Id, q.Recipient, q.Subject, q.Status, q.ErrorInfo, q.CreatedAt, q.SentAt, q.BroadcastId)
+            new QueueItemResponse(q.Id, q.Recipient, q.PhoneNumber, q.Channel, q.Subject, q.Status, q.ErrorInfo, q.CreatedAt, q.SentAt, q.BroadcastId)
         ).ToList();
     }
 

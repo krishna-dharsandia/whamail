@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import {
   LayoutDashboard, Mail, Megaphone, LayoutTemplate,
-  Users, BarChart2, Settings, LogOut,
+  Users, BarChart2, Settings, LogOut, MessageCircle,
 } from "lucide-react";
 
 import { AuthProvider, useAuth } from "@/context/AuthContext";
@@ -57,6 +57,20 @@ function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>WhatsApp</SidebarGroupLabel>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild isActive={pathname === "/whatsapp"} tooltip="WhatsApp">
+                <Link href="/whatsapp">
+                  <MessageCircle className="h-4 w-4" />
+                  <span>WhatsApp</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroup>
+
         <SidebarGroup>
           <SidebarGroupLabel>Email</SidebarGroupLabel>
           <SidebarMenu>
@@ -135,6 +149,7 @@ function MainLayout({ children }: { children: React.ReactNode }) {
 
   const breadcrumbMap: Record<string, { label: string; parent?: string }> = {
     "/dashboard":  { label: "Dashboard" },
+    "/whatsapp":   { label: "WhatsApp" },
     "/broadcast":  { label: "Broadcasts" },
     "/audience":   { label: "Audiences" },
     "/templates":  { label: "Templates" },

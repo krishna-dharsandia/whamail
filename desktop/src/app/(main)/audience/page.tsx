@@ -34,7 +34,8 @@ interface Audience {
 
 interface Contact {
   id: string;
-  email: string;
+  email: string | null;
+  phoneNumber: string | null;
   name: string | null;
   createdAt: string;
 }
@@ -43,7 +44,7 @@ interface Contact {
 type CsvDataRow = Record<string, string>;
 
 /** Describes what a column maps to in our system */
-type ColumnRole = "email" | "name" | "custom" | "skip";
+type ColumnRole = "email" | "phone" | "name" | "custom" | "skip";
 
 interface ColumnMapping {
   /** Original header from CSV */
@@ -134,6 +135,24 @@ function detectNameHeader(headers: string[]): string | null {
   return null;
 }
 
+/** Case-insensitive match for "phone" column */
+function detectPhoneHeader(headers: string[]): string | null {
+  const patterns = [
+    "phone", "phone number", "phonenumber", "phone_number", "mobile",
+    "mobile number", "whatsapp", "whatsapp number", "tel", "telephone",
+    "cell", "cellular",
+  ];
+  for (const h of headers) {
+    if (patterns.includes(h.toLowerCase().trim())) return h;
+  }
+  return null;
+}
+
+/** Validate phone number (international format) */
+function isValidPhone(phone: string) {
+  return /^\+[1-9]\d{6,14}$/.test(phone);
+}
+
 /** Convert a column header to a safe variable name */
 function headerToVariableName(header: string): string {
   return (
@@ -154,14 +173,16 @@ function isValidEmail(email: string) {
 /** Build initial column mappings from parsed headers */
 function buildInitialMappings(headers: string[], firstRow: CsvDataRow | undefined): ColumnMapping[] {
   const emailHeader = detectEmailHeader(headers);
+  const phoneHeader = detectPhoneHeader(headers);
   const nameHeader = detectNameHeader(headers);
 
   return headers.map((header, idx) => {
     let role: ColumnRole = "custom";
     if (header === emailHeader) role = "email";
+    else if (header === phoneHeader) role = "phone";
     else if (header === nameHeader) role = "name";
-    // If no email header detected, use first column as email
-    else if (!emailHeader && idx === 0) role = "email";
+    // If no email or phone header detected, use first column
+    else if (!emailHeader && !phoneHeader && idx === 0) role = "email";
 
     return {
       header,
@@ -311,12 +332,18 @@ function ColumnMappingStep({ mappings, onChange, onNext, onCancel }: ColumnMappi
                       <SelectItem value="email">
                         <span className="flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block" />
-                          Email (required)
+                          Email
+                        </span>
+                      </SelectItem>
+                      <SelectItem value="phone">
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                          Phone Number
                         </span>
                       </SelectItem>
                       <SelectItem value="name">
                         <span className="flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
                           Name
                         </span>
                       </SelectItem>
@@ -382,7 +409,7 @@ function ColumnMappingStep({ mappings, onChange, onNext, onCancel }: ColumnMappi
       {!hasEmail && (
         <p className="text-xs text-destructive flex items-center gap-1.5">
           <Info className="h-3.5 w-3.5 shrink-0" />
-          You must map at least one column to <strong>Email (required)</strong>.
+          You must map at least one column to <strong>Email</strong> or <strong>Phone Number</strong>.
         </p>
       )}
 
@@ -613,7 +640,7 @@ export default function AudiencePage() {
 
   // Add single contact
   const [addContactOpen, setAddContactOpen] = useState(false);
-  const [contactForm, setContactForm] = useState({ email: "", name: "" });
+  const [contactForm, setContactForm] = useState({ email: "", phoneNumber: "", name: "" });
   const [addingContact, setAddingContact] = useState(false);
 
   // Delete contact
@@ -696,14 +723,25 @@ export default function AudiencePage() {
   async function handleAddContact(e: React.FormEvent) {
     e.preventDefault();
     if (!activeAudience) return;
-    if (!isValidEmail(contactForm.email)) {
+    const email = contactForm.email.trim();
+    const phone = contactForm.phoneNumber.trim();
+    if (!email && !phone) {
+      toast.error("Please enter either an email or phone number.");
+      return;
+    }
+    if (email && !isValidEmail(email)) {
       toast.error("Please enter a valid email address.");
+      return;
+    }
+    if (phone && !isValidPhone(phone)) {
+      toast.error("Please enter a valid phone number (e.g. +919876543210).");
       return;
     }
     setAddingContact(true);
     try {
       const res = await audienceApi.addContact(activeAudience.id, {
-        email: contactForm.email.trim(),
+        email: email || undefined,
+        phoneNumber: phone || undefined,
         name: contactForm.name.trim() || undefined,
       });
       setContacts((prev) => [res.data, ...prev]);
@@ -715,7 +753,7 @@ export default function AudiencePage() {
       );
       toast.success("Contact added.");
       setAddContactOpen(false);
-      setContactForm({ email: "", name: "" });
+      setContactForm({ email: "", phoneNumber: "", name: "" });
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { error?: string } } })?.response?.data?.error ??
@@ -954,7 +992,7 @@ export default function AudiencePage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Email</TableHead>
+                  <TableHead>Contact</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Added</TableHead>
                   <TableHead className="w-10" />
@@ -963,7 +1001,11 @@ export default function AudiencePage() {
               <TableBody>
                 {contacts.map((c) => (
                   <TableRow key={c.id}>
-                    <TableCell className="font-medium">{c.email}</TableCell>
+                    <TableCell className="font-medium">
+                      {c.email && <div>{c.email}</div>}
+                      {c.phoneNumber && <div className="text-muted-foreground text-xs">{c.phoneNumber}</div>}
+                      {!c.email && !c.phoneNumber && "—"}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{c.name ?? "—"}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {new Date(c.createdAt).toLocaleDateString()}
@@ -997,13 +1039,22 @@ export default function AudiencePage() {
             <form onSubmit={handleAddContact}>
               <div className="space-y-4 py-2">
                 <div className="space-y-2">
-                  <Label>Email *</Label>
+                  <Label>Email</Label>
                   <Input
                     type="email"
                     placeholder="contact@example.com"
                     value={contactForm.email}
                     onChange={(e) => setContactForm((f) => ({ ...f, email: e.target.value }))}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label>Phone Number</Label>
+                  <Input
+                    placeholder="+919876543210"
+                    value={contactForm.phoneNumber}
+                    onChange={(e) => setContactForm((f) => ({ ...f, phoneNumber: e.target.value }))}
+                  />
+                  <p className="text-xs text-muted-foreground">International format with country code</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Name</Label>

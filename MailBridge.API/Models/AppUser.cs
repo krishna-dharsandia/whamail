@@ -52,11 +52,15 @@ public class AppUser
     [Column("emails_sent")]
     public int EmailsSent { get; set; } = 0;
 
+    [Column("messages_sent")]
+    public int MessagesSent { get; set; } = 0;
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation properties
     public UserCredential? Credential { get; set; }
+    public WhatsAppSession? WhatsAppSession { get; set; }
     public ICollection<EmailTemplate> Templates { get; set; } = new List<EmailTemplate>();
     public ICollection<EmailQueue> QueuedEmails { get; set; } = new List<EmailQueue>();
     public ICollection<Audience> Audiences { get; set; } = new List<Audience>();

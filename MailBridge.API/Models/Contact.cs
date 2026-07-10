@@ -14,9 +14,12 @@ public class Contact
     public Guid AudienceId { get; set; }
 
     [Column("email")]
-    [Required]
     [MaxLength(255)]
-    public string Email { get; set; } = string.Empty;
+    public string? Email { get; set; }
+
+    [Column("phone_number")]
+    [MaxLength(50)]
+    public string? PhoneNumber { get; set; }
 
     [Column("name")]
     [MaxLength(255)]
