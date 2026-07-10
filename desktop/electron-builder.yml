@@ -21,12 +21,11 @@ extraResources:
 
 compression: normal
 
-# Auto-update: publish to GitHub Releases
+# Auto-update: generic provider pointing to dedicated update release
+# Keeps main release page clean (only .exe/.dmg)
 publish:
-  provider: github
-  owner: krishna-dharsandia
-  repo: whamail
-  releaseType: release
+  provider: generic
+  url: https://github.com/krishna-dharsandia/whamail/releases/download/autoupdate
 
 protocols:
   name: Whamail
