@@ -21,6 +21,13 @@ extraResources:
 
 compression: normal
 
+# Auto-update: publish to GitHub Releases
+publish:
+  provider: github
+  owner: krishna-dharsandia
+  repo: whamail
+  releaseType: release
+
 protocols:
   name: Whamail
   schemes:
@@ -33,6 +40,10 @@ win:
         - x64
   artifactName: Whamail-Setup-${version}-${arch}.exe
   icon: build/icon.png
+  # SignPath.io will sign via CI — no local cert needed
+  signingHashAlgorithms:
+    - sha256
+  verifyUpdateCodeSignature: false
 
 nsis:
   oneClick: false
@@ -52,10 +63,17 @@ mac:
       arch:
         - x64
         - arm64
-  artifactName: Whamail-${version}-${arch}.dmg
+    - target: zip
+      arch:
+        - x64
+        - arm64
+  artifactName: Whamail-${version}-${arch}.${ext}
   category: public.app-category.productivity
   hardenedRuntime: true
   icon: build/icon.icns
+  # Ad-hoc signing (no Apple Developer account needed)
+  # Prevents "damaged" error for local builds
+  identity: null
 
 dmg:
   title: Whamail ${version}

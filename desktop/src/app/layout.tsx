@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Toaster } from "@/components/ui/sonner"
+import { UpdateBanner } from "@/components/update-banner"
 
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
@@ -29,6 +30,7 @@ export default function RootLayout({
       <body>
         <ThemeProvider>
           <TooltipProvider>
+            <UpdateBanner />
             {children}
             <Toaster richColors position="top-right" />
           </TooltipProvider>

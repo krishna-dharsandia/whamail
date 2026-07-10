@@ -16,4 +16,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
   minimizeWindow: () => ipcRenderer.send("window-minimize"),
   maximizeWindow: () => ipcRenderer.send("window-maximize"),
   closeWindow: () => ipcRenderer.send("window-close"),
+
+  // Auto-update APIs
+  onUpdateStatus: (callback: (data: unknown) => void) => {
+    const handler = (_: unknown, data: unknown) => callback(data);
+    ipcRenderer.on("update-status", handler);
+    return () => ipcRenderer.removeListener("update-status", handler);
+  },
+  updateCheck: () => ipcRenderer.send("update-check"),
+  updateDownload: () => ipcRenderer.send("update-download"),
+  updateInstall: () => ipcRenderer.send("update-install"),
 });
