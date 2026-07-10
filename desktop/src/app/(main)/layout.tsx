@@ -22,12 +22,18 @@ import {
   BreadcrumbPage, BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 
-const navItems = [
-  { label: "Dashboard",  href: "/dashboard",  icon: LayoutDashboard },
+const campaignItems = [
   { label: "Audiences",  href: "/audience",   icon: Users },
   { label: "Templates",  href: "/templates",  icon: LayoutTemplate },
   { label: "Broadcasts", href: "/broadcast",  icon: Megaphone },
-  { label: "Emails",     href: "/emails",     icon: Mail },
+];
+
+const channelItems = [
+  { label: "WhatsApp",   href: "/whatsapp",   icon: MessageCircle },
+  { label: "Email Queue", href: "/emails",    icon: Mail },
+];
+
+const insightItems = [
   { label: "Metrics",    href: "/metrics",    icon: BarChart2 },
 ];
 
@@ -58,13 +64,12 @@ function AppSidebar() {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>WhatsApp</SidebarGroupLabel>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton asChild isActive={pathname === "/whatsapp"} tooltip="WhatsApp">
-                <Link href="/whatsapp">
-                  <MessageCircle className="h-4 w-4" />
-                  <span>WhatsApp</span>
+              <SidebarMenuButton asChild isActive={pathname === "/dashboard"} tooltip="Dashboard">
+                <Link href="/dashboard">
+                  <LayoutDashboard className="h-4 w-4" />
+                  <span>Dashboard</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -72,9 +77,41 @@ function AppSidebar() {
         </SidebarGroup>
 
         <SidebarGroup>
-          <SidebarGroupLabel>Email</SidebarGroupLabel>
+          <SidebarGroupLabel>Campaigns</SidebarGroupLabel>
           <SidebarMenu>
-            {navItems.map(({ label, href, icon: Icon }) => (
+            {campaignItems.map(({ label, href, icon: Icon }) => (
+              <SidebarMenuItem key={href}>
+                <SidebarMenuButton asChild isActive={pathname.startsWith(href)} tooltip={label}>
+                  <Link href={href}>
+                    <Icon className="h-4 w-4" />
+                    <span>{label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Channels</SidebarGroupLabel>
+          <SidebarMenu>
+            {channelItems.map(({ label, href, icon: Icon }) => (
+              <SidebarMenuItem key={href}>
+                <SidebarMenuButton asChild isActive={pathname.startsWith(href)} tooltip={label}>
+                  <Link href={href}>
+                    <Icon className="h-4 w-4" />
+                    <span>{label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Insights</SidebarGroupLabel>
+          <SidebarMenu>
+            {insightItems.map(({ label, href, icon: Icon }) => (
               <SidebarMenuItem key={href}>
                 <SidebarMenuButton asChild isActive={pathname.startsWith(href)} tooltip={label}>
                   <Link href={href}>
