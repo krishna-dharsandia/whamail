@@ -4,6 +4,7 @@ import qrcode from "qrcode";
 import { BrowserWindow, ipcMain, app } from "electron";
 import path from "path";
 import fs from "fs";
+import puppeteer from "puppeteer";
 
 export type WhatsAppStatus =
   | "disconnected"
@@ -61,20 +62,27 @@ export function initWhatsApp(win: BrowserWindow) {
     emitStatus("disconnected");
     lastQrDataUrl = null;
 
+    // Resolve Chromium path — puppeteer's bundled chrome or system fallback
+    let chromePath: string | undefined;
+    try {
+      chromePath = puppeteer.executablePath();
+    } catch {
+      // fallback: let puppeteer-core find it
+    }
+
     client = new Client({
       authStrategy: new LocalAuth({
         dataPath: sessionDir,
       }),
       puppeteer: {
         headless: true,
+        executablePath: chromePath,
         args: [
           "--no-sandbox",
           "--disable-setuid-sandbox",
           "--disable-dev-shm-usage",
           "--disable-accelerated-2d-canvas",
           "--no-first-run",
-          "--no-zygote",
-          "--single-process",
           "--disable-gpu",
         ],
       },
