@@ -25,6 +25,8 @@ publish/
 .env
 .env.*
 !.env.example
+appsettings.Local.json
+appsettings.Development.json
 
 # OS
 .DS_Store

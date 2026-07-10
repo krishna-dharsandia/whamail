@@ -7,6 +7,9 @@ using Npgsql;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Load local secrets (gitignored) that override appsettings.json placeholders
+builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: false);
+
 var rawConnectionString = builder.Configuration.GetConnectionString("Supabase")
                           ?? throw new InvalidOperationException(
                               "Connection string 'Supabase' is missing. Set it in Azure App Service → Configuration → Connection Strings.");
