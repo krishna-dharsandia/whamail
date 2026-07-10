@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, "..");
 const buildDir = join(root, "build");
-const source = join(buildDir, "ChatGPT Image Jul 10, 2026, 12_11_15 AM.png");
+const source = join(buildDir, "icon-transparent.png");
 
 mkdirSync(buildDir, { recursive: true });
 
