@@ -7,6 +7,9 @@ on:
 permissions:
   contents: write
 
+env:
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -33,9 +36,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Upload installer + latest.yml (needed for auto-updater)
       - uses: softprops/action-gh-release@v2
         with:
-          files: desktop/dist/Whamail-Setup-*-x64.exe
+          files: |
+            desktop/dist/Whamail-Setup-*-x64.exe
+            desktop/dist/latest.yml
           generate_release_notes: true
 
   build-mac-arm64:
@@ -62,10 +68,19 @@ jobs:
         working-directory: desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Ad-hoc sign (no Apple Developer ID)
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      # Remove macOS quarantine attribute from DMG before upload
+      - name: Remove quarantine xattr
+        run: xattr -cr desktop/dist/*.dmg desktop/dist/*.zip 2>/dev/null || true
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: desktop/dist/Whamail-*-arm64.dmg
+          files: |
+            desktop/dist/Whamail-*-arm64.dmg
+            desktop/dist/Whamail-*-arm64.zip
+            desktop/dist/latest-mac.yml
           generate_release_notes: true
 
   build-mac-x64:
@@ -92,8 +107,15 @@ jobs:
         working-directory: desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: Remove quarantine xattr
+        run: xattr -cr desktop/dist/*.dmg desktop/dist/*.zip 2>/dev/null || true
 
       - uses: softprops/action-gh-release@v2
         with:
-          files: desktop/dist/Whamail-*-x64.dmg
+          files: |
+            desktop/dist/Whamail-*-x64.dmg
+            desktop/dist/Whamail-*-x64.zip
+            desktop/dist/latest-mac.yml
           generate_release_notes: true

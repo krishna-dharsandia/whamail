@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync } from "node:fs";
 import { launchApi, killApi, ApiProcessResult } from "./api-process.js";
+import { initAutoUpdater } from "./updater.js";
 import { ChildProcess } from "node:child_process";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
@@ -195,6 +196,9 @@ function createWindow() {
 
   mainWindow.once("ready-to-show", () => {
     mainWindow?.show();
+    if (!isDev) {
+      initAutoUpdater(mainWindow!);
+    }
   });
 
   // Close → hide to tray instead of quitting
