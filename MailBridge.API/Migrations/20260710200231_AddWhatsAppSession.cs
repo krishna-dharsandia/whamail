@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace MailBridge.API.Migrations
+namespace Whamail.API.Migrations
 {
     /// <inheritdoc />
     public partial class AddWhatsAppSession : Migration

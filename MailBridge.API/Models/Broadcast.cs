@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace MailBridge.API.Models;
+namespace Whamail.API.Models;
 
 [Table("broadcasts")]
 public class Broadcast

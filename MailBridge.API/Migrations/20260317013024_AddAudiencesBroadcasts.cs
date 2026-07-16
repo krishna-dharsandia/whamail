@@ -2,7 +2,7 @@
 
 #nullable disable
 
-namespace MailBridge.API.Migrations
+namespace Whamail.API.Migrations
 {
     /// <inheritdoc />
     public partial class AddAudiencesBroadcasts : Migration

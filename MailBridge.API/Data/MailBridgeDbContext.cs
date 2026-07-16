@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using MailBridge.API.Models;
-using MailBridge.API.Services;
+using Whamail.API.Models;
+using Whamail.API.Services;
 
-namespace MailBridge.API.Data;
+namespace Whamail.API.Data;
 
 public class MailBridgeDbContext : DbContext
 {
@@ -22,6 +22,7 @@ public class MailBridgeDbContext : DbContext
     public DbSet<Contact> Contacts { get; set; }
     public DbSet<Broadcast> Broadcasts { get; set; }
     public DbSet<WhatsAppSession> WhatsAppSessions { get; set; }
+    public DbSet<UserFile> UserFiles { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -58,6 +59,11 @@ public class MailBridgeDbContext : DbContext
             e.HasMany(u => u.Broadcasts)
              .WithOne(b => b.User)
              .HasForeignKey(b => b.UserId)
+             .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasMany(u => u.Files)
+             .WithOne(f => f.User)
+             .HasForeignKey(f => f.UserId)
              .OnDelete(DeleteBehavior.Cascade);
 
             e.HasIndex(u => u.Email).IsUnique();
@@ -153,5 +159,11 @@ public class MailBridgeDbContext : DbContext
 
         modelBuilder.Entity<Broadcast>()
             .HasQueryFilter(b => _currentUserId == null || b.UserId == _currentUserId);
+
+        modelBuilder.Entity<UserFile>()
+            .HasQueryFilter(f => _currentUserId == null || f.UserId == _currentUserId);
+
+        modelBuilder.Entity<UserFile>()
+            .HasIndex(f => f.UserId);
     }
 }

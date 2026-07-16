@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace MailBridge.API.Models;
+namespace Whamail.API.Models;
 
 [Table("profiles")]
 public class AppUser
@@ -65,4 +65,5 @@ public class AppUser
     public ICollection<EmailQueue> QueuedEmails { get; set; } = new List<EmailQueue>();
     public ICollection<Audience> Audiences { get; set; } = new List<Audience>();
     public ICollection<Broadcast> Broadcasts { get; set; } = new List<Broadcast>();
+    public ICollection<UserFile> Files { get; set; } = new List<UserFile>();
 }

@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, QrCode, Phone, Send, CheckCircle2, XCircle, Wifi, WifiOff, User } from "lucide-react";
+import { Loader2, QrCode, Phone, Send, CheckCircle2, XCircle, Wifi, WifiOff, User, Monitor } from "lucide-react";
 import { useWhatsApp } from "@/hooks/use-whatsapp";
+import { PageActions } from "../layout";
 import { sounds } from "@/lib/sounds";
 import { toast } from "sonner";
 
@@ -18,6 +19,7 @@ export default function WhatsAppPage() {
     info,
     detail,
     sendProgress,
+    isElectron,
     connect,
     disconnect,
     sendMessage,
@@ -53,12 +55,12 @@ export default function WhatsAppPage() {
     setSending(false);
     if (result.success) {
       sounds.success();
-      toast.success("Message sent successfully!");
+      toast.success("Message sent!");
       setTestPhone("");
       setTestMessage("");
     } else {
       sounds.error();
-      toast.error(result.error || "Failed to send message");
+      toast.error(result.error || "Failed to send");
     }
   }, [testPhone, testMessage, sendMessage]);
 
@@ -101,21 +103,44 @@ export default function WhatsAppPage() {
   return (
     <div className="flex-1 overflow-auto">
       <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">WhatsApp Connection</h1>
-            <p className="text-muted-foreground">
-              Connect your WhatsApp account to send broadcast messages
-            </p>
-          </div>
+        <PageActions>
           <div className="flex items-center gap-2">
+            {!isElectron && (
+              <Badge variant="outline" className="text-xs">
+                <Monitor className="h-3 w-3 mr-1" />
+                Web Mode
+              </Badge>
+            )}
             <div className={`h-2 w-2 rounded-full ${currentStatus.color}`} />
             <Badge variant={status === "ready" ? "default" : "secondary"}>
               <StatusIcon className={`h-3 w-3 mr-1 ${status === "authenticated" ? "animate-spin" : ""}`} />
               {currentStatus.label}
             </Badge>
           </div>
-        </div>
+        </PageActions>
+
+        {/* Web mode banner */}
+        {!isElectron && status !== "ready" && (
+          <Card className="border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-950/30">
+            <CardContent className="p-4 flex items-start gap-3">
+              <Monitor className="h-5 w-5 text-yellow-600 dark:text-yellow-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                  Running in web mode
+                </p>
+                <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                  WhatsApp connection requires the Whamail desktop app. QR scanning, sending messages, and number
+                  checking need Electron. Open the desktop app to connect your WhatsApp account.
+                </p>
+                {info && (
+                  <p className="text-xs text-yellow-700 dark:text-yellow-300 mt-2">
+                    Last connected session: <strong>{info.name}</strong> (+{info.phone})
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
@@ -127,7 +152,9 @@ export default function WhatsAppPage() {
               <CardDescription>
                 {status === "ready"
                   ? "Your WhatsApp account is connected"
-                  : "Scan the QR code with your phone to connect"}
+                  : isElectron
+                    ? "Scan the QR code with your phone to connect"
+                    : "Open the desktop app to connect"}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -168,7 +195,9 @@ export default function WhatsAppPage() {
                       ? detail || "Connection failed. Please try again."
                       : status === "authenticated"
                       ? "Authenticating with WhatsApp..."
-                      : "Click connect to start"}
+                      : isElectron
+                        ? "Click connect to start"
+                        : "Open desktop app to connect"}
                   </p>
                 </div>
               )}
@@ -177,14 +206,14 @@ export default function WhatsAppPage() {
 
               <div className="flex gap-2">
                 {status === "ready" ? (
-                  <Button variant="destructive" onClick={handleDisconnect} className="flex-1">
+                  <Button variant="destructive" onClick={handleDisconnect} className="flex-1" disabled={!isElectron}>
                     <WifiOff className="h-4 w-4 mr-2" />
                     Disconnect
                   </Button>
                 ) : (
                   <Button
                     onClick={handleConnect}
-                    disabled={status === "authenticated" || status === "qr"}
+                    disabled={!isElectron || status === "authenticated" || status === "qr"}
                     className="flex-1"
                   >
                     {status === "authenticated" || status === "qr" ? (
@@ -192,7 +221,9 @@ export default function WhatsAppPage() {
                     ) : (
                       <Wifi className="h-4 w-4 mr-2" />
                     )}
-                    {status === "qr" ? "Waiting for scan..." : status === "authenticated" ? "Authenticating..." : "Connect"}
+                    {!isElectron
+                      ? "Desktop app required"
+                      : status === "qr" ? "Waiting for scan..." : status === "authenticated" ? "Authenticating..." : "Connect"}
                   </Button>
                 )}
               </div>
@@ -220,13 +251,13 @@ export default function WhatsAppPage() {
                       setTestPhone(e.target.value);
                       setNumberRegistered(null);
                     }}
-                    disabled={status !== "ready"}
+                    disabled={status !== "ready" || !isElectron}
                   />
                   <Button
                     variant="outline"
                     size="icon"
                     onClick={handleCheckNumber}
-                    disabled={status !== "ready" || !testPhone || checking}
+                    disabled={status !== "ready" || !testPhone || checking || !isElectron}
                   >
                     {checking ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -248,13 +279,13 @@ export default function WhatsAppPage() {
                   placeholder="Hello! This is a test message from Whamail."
                   value={testMessage}
                   onChange={(e) => setTestMessage(e.target.value)}
-                  disabled={status !== "ready"}
+                  disabled={status !== "ready" || !isElectron}
                 />
               </div>
 
               <Button
                 onClick={handleSendTest}
-                disabled={status !== "ready" || !testPhone || !testMessage || sending}
+                disabled={status !== "ready" || !testPhone || !testMessage || sending || !isElectron}
                 className="w-full"
               >
                 {sending ? (

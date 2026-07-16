@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
-  ChevronLeft, ChevronRight, ExternalLink, Loader2, Megaphone, Plus, Send, Trash2, Mail, MessageCircle,
+  ChevronLeft, ChevronRight, Loader2, Mail,
+  Megaphone, MessageCircle, Plus, Send, Trash2,
 } from "lucide-react";
 
 import { useRouter } from "next/navigation";
 import { audienceApi, broadcastApi, templateApi } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
@@ -20,7 +20,11 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Progress } from "@/components/ui/progress";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import { PageActions, useGlobalRefresh } from "../layout";
+import { useTableHeight } from "@/hooks/use-table-height";
 
 interface Broadcast {
   id: string;
@@ -35,6 +39,8 @@ interface Broadcast {
   totalRecipients: number;
   sentCount: number;
   failedCount: number;
+  openCount?: number;
+  totalOpenCount?: number;
   createdAt: string;
   sentAt: string | null;
 }
@@ -43,6 +49,7 @@ interface Audience {
   id: string;
   name: string;
   contactCount: number;
+  type: string;
 }
 
 interface Template {
@@ -51,20 +58,21 @@ interface Template {
   subjectTemplate: string;
 }
 
-const STATUS_COLORS: Record<string, string> = {
+const STATUS_VARIANT: Record<string, string> = {
   Draft: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300",
   Sending: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
   Completed: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
   Failed: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
 };
 
-// 3-step wizard state
 type WizardStep = 1 | 2 | 3;
 
 export default function BroadcastPage() {
   const router = useRouter();
+  const { containerRef, pageSize } = useTableHeight();
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardStep, setWizardStep] = useState<WizardStep>(1);
   const [audiences, setAudiences] = useState<Audience[]>([]);
@@ -83,19 +91,7 @@ export default function BroadcastPage() {
     subjectOverride: "",
   });
 
-  useEffect(() => {
-    loadBroadcasts();
-  }, []);
-
-  // Auto-refresh every 5s when any broadcast is in "Sending" status
-  useEffect(() => {
-    const hasSending = broadcasts.some((b) => b.status === "Sending");
-    if (!hasSending) return;
-    const interval = setInterval(loadBroadcasts, 5000);
-    return () => clearInterval(interval);
-  }, [broadcasts]);
-
-  async function loadBroadcasts() {
+  const loadBroadcasts = useCallback(async () => {
     try {
       const res = await broadcastApi.getAll();
       setBroadcasts(res.data);
@@ -104,7 +100,18 @@ export default function BroadcastPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => { loadBroadcasts(); }, [loadBroadcasts]);
+
+  useEffect(() => {
+    const hasSending = broadcasts.some((b) => b.status === "Sending");
+    if (!hasSending) return;
+    const interval = setInterval(loadBroadcasts, 5000);
+    return () => clearInterval(interval);
+  }, [broadcasts, loadBroadcasts]);
+
+  useGlobalRefresh(loadBroadcasts);
 
   async function openWizard() {
     setForm({ name: "", channel: "email", audienceId: "", templateId: "", subjectOverride: "" });
@@ -134,23 +141,24 @@ export default function BroadcastPage() {
       });
       setBroadcasts((prev) => [res.data, ...prev]);
       setWizardOpen(false);
-      toast.success("Broadcast created. Click Send when ready.");
+      toast.success("Broadcast created.");
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to create broadcast.";
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to create.";
       toast.error(msg);
     } finally {
       setCreating(false);
     }
   }
 
-  async function handleSend(id: string) {
+  async function handleSend(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
     setSending(id);
     try {
       const res = await broadcastApi.send(id);
       setBroadcasts((prev) => prev.map((b) => b.id === id ? res.data : b));
-      toast.success("Broadcast is sending! Emails are being queued.");
+      toast.success("Sending!");
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to send broadcast.";
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to send.";
       toast.error(msg);
     } finally {
       setSending(null);
@@ -163,21 +171,36 @@ export default function BroadcastPage() {
     try {
       await broadcastApi.delete(deleteId);
       setBroadcasts((prev) => prev.filter((b) => b.id !== deleteId));
-      toast.success("Broadcast deleted.");
+      toast.success("Deleted.");
       setDeleteId(null);
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to delete broadcast.";
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to delete.";
       toast.error(msg);
     } finally {
       setDeleting(false);
     }
   }
 
-  const selectedAudience = audiences.find((a) => a.id === form.audienceId);
+  const filteredAudiences = audiences.filter((a) => a.type === form.channel);
+  const selectedAudience = filteredAudiences.find((a) => a.id === form.audienceId);
   const selectedTemplate = templates.find((t) => t.id === form.templateId);
-
   const canProceedStep1 = !!form.name.trim();
   const canProceedStep2 = !!form.audienceId && !!form.templateId;
+
+  useEffect(() => {
+    if (form.audienceId && !filteredAudiences.some((a) => a.id === form.audienceId)) {
+      setForm((current) => ({ ...current, audienceId: "" }));
+    }
+  }, [filteredAudiences, form.audienceId]);
+
+  // Sort broadcasts: Sending first, then Draft, Completed, Failed
+  const STATUS_ORDER: Record<string, number> = { Sending: 0, Draft: 1, Completed: 2, Failed: 3 };
+  const sorted = [...broadcasts].sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9));
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const safePage = Math.min(page, totalPages - 1);
+  const paged = sorted.slice(safePage * pageSize, (safePage + 1) * pageSize);
 
   if (loading) {
     return (
@@ -188,109 +211,163 @@ export default function BroadcastPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Broadcasts</h1>
-          <p className="text-muted-foreground text-sm mt-1">Create and send email campaigns.</p>
-        </div>
-        <Button onClick={openWizard}>
-          <Plus className="h-4 w-4 mr-2" /> New Broadcast
+    <div ref={containerRef} className="flex flex-col flex-1 min-h-0">
+      <PageActions>
+        <Button onClick={openWizard} size="sm">
+          <Plus className="h-4 w-4 mr-1" /> Broadcast
         </Button>
-      </div>
+      </PageActions>
 
       {broadcasts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-64 text-center">
+        <div className="flex flex-col items-center justify-center flex-1 text-center">
           <Megaphone className="h-10 w-10 text-muted-foreground mb-3" />
           <p className="font-medium">No broadcasts yet</p>
-          <p className="text-sm text-muted-foreground mt-1">Create your first broadcast to send emails to an audience.</p>
+          <p className="text-sm text-muted-foreground mt-1">Create your first broadcast to get started.</p>
           <Button className="mt-4" onClick={openWizard}>
             <Plus className="h-4 w-4 mr-2" /> Create Broadcast
           </Button>
         </div>
       ) : (
-        <div className="space-y-3">
-          {broadcasts.map((b) => {
-            const progress = b.totalRecipients > 0
-              ? Math.round(((b.sentCount + b.failedCount) / b.totalRecipients) * 100)
-              : 0;
-
-            return (
-              <Card key={b.id}>
-                <CardContent className="p-4">
-                  <div className="flex flex-col sm:flex-row sm:items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium">{b.name}</span>
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[b.status] ?? ""}`}>
-                          {b.status}
-                        </span>
+        <>
+          <div className="flex-1 min-h-0 overflow-auto border rounded-lg">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Channel</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Sent</TableHead>
+                  <TableHead className="text-right">Opens</TableHead>
+                  <TableHead className="text-right">Failed</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="w-20" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paged.map((b, idx) => {
+                  const openCount = b.openCount ?? 0;
+                  const prevStatus = idx > 0 ? paged[idx - 1].status : null;
+                  const showGroupHeader = b.status !== prevStatus;
+                  return (
+                    <>
+                    {showGroupHeader && (
+                      <TableRow key={`group-${b.status}`} className="bg-muted/30 hover:bg-muted/30">
+                        <TableCell colSpan={8} className="py-1.5 px-4">
+                          <span className={`text-xs font-medium ${STATUS_VARIANT[b.status] ? "" : "text-muted-foreground"}`}>
+                            {b.status} ({sorted.filter(s => s.status === b.status).length})
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                    <TableRow
+                      key={b.id}
+                      className="cursor-pointer"
+                      onClick={() => router.push(`/broadcast/${b.id}`)}
+                    >
+                      <TableCell>
+                        <div className="min-w-0">
+                          <p className="font-medium truncate max-w-[200px]">{b.name}</p>
+                          <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                            {b.audienceName} · {b.templateName}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
                           b.channel === "whatsapp"
                             ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
                             : "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
                         }`}>
-                          {b.channel === "whatsapp" ? "WhatsApp" : "Email"}
+                          {b.channel === "whatsapp" ? "WA" : "Email"}
                         </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        {b.audienceName} · {b.templateName}
-                        {b.subjectOverride && ` · "${b.subjectOverride}"`}
-                      </p>
-                      {(b.status === "Sending" || b.status === "Completed") && (
-                        <div className="mt-2 space-y-1">
-                          <Progress value={progress} className="h-1.5" />
-                          <p className="text-xs text-muted-foreground">
-                            {b.sentCount} sent · {b.failedCount} failed · {b.totalRecipients} total
-                          </p>
-                        </div>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Created {new Date(b.createdAt).toLocaleDateString()}
-                        {b.sentAt && ` · Sent ${new Date(b.sentAt).toLocaleDateString()}`}
-                      </p>
-                    </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_VARIANT[b.status] ?? ""}`}>
+                          {b.status}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {b.sentCount}/{b.totalRecipients}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {openCount}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {b.failedCount > 0 ? (
+                          <span className="text-red-600 dark:text-red-400">{b.failedCount}</span>
+                        ) : (
+                          <span className="text-muted-foreground">0</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {b.sentAt
+                          ? new Date(b.sentAt).toLocaleDateString()
+                          : new Date(b.createdAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        {b.status === "Draft" && (
+                          <div className="flex gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              onClick={(e) => handleSend(b.id, e)}
+                              disabled={sending === b.id}
+                            >
+                              {sending === b.id
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : <Send className="h-3.5 w-3.5" />
+                              }
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={(e) => { e.stopPropagation(); setDeleteId(b.id); }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                    </>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
 
-                    <div className="flex gap-2 shrink-0">
-                      {b.status === "Draft" && (
-                        <>
-                          <Button
-                            size="sm"
-                            onClick={() => handleSend(b.id)}
-                            disabled={sending === b.id}
-                          >
-                            {sending === b.id
-                              ? <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                              : <Send className="h-4 w-4 mr-1" />
-                            }
-                            Send
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-muted-foreground hover:text-destructive"
-                            onClick={() => setDeleteId(b.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                      {b.status !== "Draft" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => router.push(`/broadcast/${b.id}`)}
-                        >
-                          <ExternalLink className="h-4 w-4 mr-1" /> View
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+          {/* Pagination */}
+          <div className="flex items-center justify-between pt-3 shrink-0">
+            <p className="text-xs text-muted-foreground">
+              {broadcasts.length} broadcast{broadcasts.length !== 1 ? "s" : ""}
+            </p>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-7 w-7"
+                disabled={safePage === 0}
+                onClick={() => setPage((p) => p - 1)}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-xs text-muted-foreground px-2">
+                {safePage + 1} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-7 w-7"
+                disabled={safePage >= totalPages - 1}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Wizard Dialog */}
@@ -309,7 +386,6 @@ export default function BroadcastPage() {
             </div>
           ) : (
             <div className="py-2 space-y-4">
-              {/* Step 1: Channel & Name */}
               {wizardStep === 1 && (
                 <div className="space-y-4">
                   <div className="space-y-2">
@@ -355,38 +431,32 @@ export default function BroadcastPage() {
                 </div>
               )}
 
-              {/* Step 2: Audience & Template */}
               {wizardStep === 2 && (
                 <>
                   <div className="space-y-2">
                     <Label>Audience</Label>
-                    {audiences.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No audiences found. Create one first.</p>
+                    {filteredAudiences.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        No {form.channel === "whatsapp" ? "WhatsApp" : "email"} audiences found. Create one first.
+                      </p>
                     ) : (
                       <Select value={form.audienceId} onValueChange={(v) => setForm((f) => ({ ...f, audienceId: v }))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select an audience" />
-                        </SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder="Select an audience" /></SelectTrigger>
                         <SelectContent>
-                          {audiences.map((a) => (
-                            <SelectItem key={a.id} value={a.id}>
-                              {a.name} ({a.contactCount} contacts)
-                            </SelectItem>
+                          {filteredAudiences.map((a) => (
+                            <SelectItem key={a.id} value={a.id}>{a.name} ({a.contactCount} contacts)</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     )}
                   </div>
-
                   <div className="space-y-2">
                     <Label>Template</Label>
                     {templates.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No templates found. Create one first.</p>
                     ) : (
                       <Select value={form.templateId} onValueChange={(v) => setForm((f) => ({ ...f, templateId: v }))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a template" />
-                        </SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder="Select a template" /></SelectTrigger>
                         <SelectContent>
                           {templates.map((t) => (
                             <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
@@ -395,7 +465,6 @@ export default function BroadcastPage() {
                       </Select>
                     )}
                   </div>
-
                   {form.channel === "email" && (
                     <div className="space-y-2">
                       <Label>Subject Override <span className="text-muted-foreground text-xs">(optional)</span></Label>
@@ -409,7 +478,6 @@ export default function BroadcastPage() {
                 </>
               )}
 
-              {/* Step 3: Review */}
               {wizardStep === 3 && (
                 <div className="rounded-lg border p-4 space-y-2 text-sm">
                   <div className="flex justify-between">

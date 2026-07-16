@@ -1,10 +1,10 @@
 using System.Text.Json;
-using MailBridge.API.Data;
-using MailBridge.API.DTOs;
-using MailBridge.API.Models;
+using Whamail.API.Data;
+using Whamail.API.DTOs;
+using Whamail.API.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace MailBridge.API.Services;
+namespace Whamail.API.Services;
 
 public interface IQueueService
 {

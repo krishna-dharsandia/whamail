@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import {
-  LayoutDashboard, Mail, Megaphone, LayoutTemplate,
-  Users, BarChart2, Settings, LogOut, MessageCircle,
+  ChevronRight, FolderOpen, Info, LayoutDashboard, Mail, Megaphone, LayoutTemplate,
+  Users, Settings, LogOut, MessageCircle, RefreshCw,
 } from "lucide-react";
 
 import { AuthProvider, useAuth } from "@/context/AuthContext";
@@ -16,16 +17,89 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
-  Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList,
-  BreadcrumbPage, BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+// ── Route-based page header config ──
+const PAGE_HEADERS: Record<string, { title: string; info?: string }> = {
+  "/dashboard":  { title: "Dashboard", info: "Overview of your email and messaging activity." },
+  "/audience":   { title: "Audiences", info: "Manage contact lists for your campaigns." },
+  "/templates":  { title: "Templates", info: "Create and manage email templates with drag-and-drop editor." },
+  "/broadcast":  { title: "Broadcasts", info: "Create and send email or WhatsApp campaigns to your audiences." },
+  "/whatsapp":   { title: "WhatsApp", info: "Connect your WhatsApp account to send broadcast messages." },
+  "/emails":     { title: "Email Queue", info: "Email delivery log and queue status." },
+  "/files":      { title: "Files", info: "Upload and manage files for email attachments." },
+  "/settings":   { title: "Settings", info: "Configure your sending credentials and preferences." },
+};
+
+function getPageHeader(pathname: string) {
+  // Exact match first
+  if (PAGE_HEADERS[pathname]) return PAGE_HEADERS[pathname];
+  // Match parent route for dynamic pages (e.g. /broadcast/[id])
+  const parent = "/" + pathname.split("/").filter(Boolean)[0];
+  return PAGE_HEADERS[parent] ?? null;
+}
+
+const PAGE_ACTIONS_ID = "page-header-actions";
+const BREADCRUMB_LABEL_ID = "breadcrumb-label";
+
+/** Hook for pages to portal their action button into global header */
+export function usePageActions() {
+  const [target, setTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setTarget(document.getElementById(PAGE_ACTIONS_ID));
+  }, []);
+  return target;
+}
+
+/** Render children into global header action slot */
+export function PageActions({ children }: { children: React.ReactNode }) {
+  const target = usePageActions();
+  if (!target) return null;
+  return createPortal(children, target);
+}
+
+/** Hook for pages to portal their breadcrumb label into global header */
+export function useBreadcrumbLabel() {
+  const [target, setTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    setTarget(document.getElementById(BREADCRUMB_LABEL_ID));
+  }, []);
+  return target;
+}
+
+/** Render children into the breadcrumb label slot (replaces "Detail") */
+export function BreadcrumbLabel({ children }: { children: React.ReactNode }) {
+  const target = useBreadcrumbLabel();
+  if (!target) return null;
+  return createPortal(
+    <>
+      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+      <span className="text-sm font-semibold">{children}</span>
+    </>,
+    target
+  );
+}
+
+/** Global refresh event name */
+export const REFRESH_EVENT = "app-refresh";
+
+/** Hook for pages to register their refresh handler */
+export function useGlobalRefresh(handler: () => void) {
+  useEffect(() => {
+    window.addEventListener(REFRESH_EVENT, handler);
+    return () => window.removeEventListener(REFRESH_EVENT, handler);
+  }, [handler]);
+}
 
 const campaignItems = [
   { label: "Audiences",  href: "/audience",   icon: Users },
   { label: "Templates",  href: "/templates",  icon: LayoutTemplate },
   { label: "Broadcasts", href: "/broadcast",  icon: Megaphone },
+  { label: "Files",      href: "/files",      icon: FolderOpen },
 ];
 
 const channelItems = [
@@ -33,9 +107,6 @@ const channelItems = [
   { label: "Email Queue", href: "/emails",    icon: Mail },
 ];
 
-const insightItems = [
-  { label: "Metrics",    href: "/metrics",    icon: BarChart2 },
-];
 
 function AppSidebar() {
   const pathname = usePathname();
@@ -108,21 +179,6 @@ function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel>Insights</SidebarGroupLabel>
-          <SidebarMenu>
-            {insightItems.map(({ label, href, icon: Icon }) => (
-              <SidebarMenuItem key={href}>
-                <SidebarMenuButton asChild isActive={pathname.startsWith(href)} tooltip={label}>
-                  <Link href={href}>
-                    <Icon className="h-4 w-4" />
-                    <span>{label}</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter>
@@ -169,6 +225,13 @@ function MainLayout({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = useCallback(() => {
+    setRefreshing(true);
+    window.dispatchEvent(new Event(REFRESH_EVENT));
+    setTimeout(() => setRefreshing(false), 600);
+  }, []);
 
   useEffect(() => {
     if (!loading && !session) {
@@ -184,40 +247,10 @@ function MainLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const breadcrumbMap: Record<string, { label: string; parent?: string }> = {
-    "/dashboard":  { label: "Dashboard" },
-    "/whatsapp":   { label: "WhatsApp" },
-    "/broadcast":  { label: "Broadcasts" },
-    "/audience":   { label: "Audiences" },
-    "/templates":  { label: "Templates" },
-    "/emails":     { label: "Emails" },
-    "/metrics":    { label: "Metrics" },
-    "/settings":   { label: "Settings" },
-  };
-
-  const pathSegments = pathname.split("/").filter(Boolean);
-  const crumbs: { label: string; href: string; isLast: boolean }[] = [];
-  let cummulative = "";
-  pathSegments.forEach((seg, i) => {
-    cummulative += `/${seg}`;
-    const matched = breadcrumbMap[cummulative];
-    if (matched) {
-      crumbs.push({
-        label: matched.label,
-        href: cummulative,
-        isLast: i === pathSegments.length - 1,
-      });
-    }
-  });
-
-  // If no map match (e.g. dynamic routes), use the last segment as label
-  if (crumbs.length === 0 && pathSegments.length > 0) {
-    crumbs.push({
-      label: pathSegments[pathSegments.length - 1].replace(/^./, (c) => c.toUpperCase()),
-      href: pathname,
-      isLast: true,
-    });
-  }
+  const segments = pathname.split("/").filter(Boolean);
+  const parentPath = "/" + segments[0];
+  const parentHeader = PAGE_HEADERS[parentPath];
+  const isSubPage = segments.length > 1;
 
   return (
     <SidebarProvider>
@@ -226,22 +259,41 @@ function MainLayout({ children }: { children: React.ReactNode }) {
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="h-6" />
-          <Breadcrumb>
-            <BreadcrumbList>
-              {crumbs.map((c, i) => (
-                <BreadcrumbItem key={c.href}>
-                  {c.isLast ? (
-                    <BreadcrumbPage>{c.label}</BreadcrumbPage>
-                  ) : (
-                    <BreadcrumbLink asChild>
-                      <Link href={c.href}>{c.label}</Link>
-                    </BreadcrumbLink>
+          {parentHeader && (
+            <div className="flex items-center gap-1.5">
+              {isSubPage ? (
+                <>
+                  <Link href={parentPath} className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+                    {parentHeader.title}
+                  </Link>
+                  <span id={BREADCRUMB_LABEL_ID} className="contents" />
+                </>
+              ) : (
+                <>
+                  <h1 className="text-sm font-semibold">{parentHeader.title}</h1>
+                  {parentHeader.info && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">
+                          <p>{parentHeader.info}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   )}
-                  {i < crumbs.length - 1 && <BreadcrumbSeparator />}
-                </BreadcrumbItem>
-              ))}
-            </BreadcrumbList>
-          </Breadcrumb>
+                  <span id={BREADCRUMB_LABEL_ID} className="contents" />
+                </>
+              )}
+            </div>
+          )}
+          <div className="ml-auto flex items-center gap-2">
+            <div id={PAGE_ACTIONS_ID} className="flex items-center gap-2" />
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleRefresh} disabled={refreshing}>
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
         </header>
         <main className="flex-1 p-6 flex flex-col min-h-0 overflow-hidden">
           {children}

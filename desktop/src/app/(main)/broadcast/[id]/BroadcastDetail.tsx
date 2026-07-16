@@ -17,12 +17,14 @@ import {
 } from "lucide-react";
 
 import { broadcastApi } from "@/lib/api";
+import { PageActions, BreadcrumbLabel } from "../../layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 interface BroadcastContact {
-  email: string;
+  email: string | null;
+  phoneNumber: string | null;
   name: string | null;
   queueStatus: string | null;
   sentAt: string | null;
@@ -32,14 +34,15 @@ interface BroadcastResponse {
   id: string;
   name: string;
   status: string;
+  channel: string;
   audienceName: string;
   templateName: string;
   subjectOverride: string | null;
   totalRecipients: number;
   sentCount: number;
   failedCount: number;
-  openCount: number;
-  totalOpenCount: number;
+  openCount?: number;
+  totalOpenCount?: number;
   createdAt: string;
   sentAt: string | null;
 }
@@ -61,6 +64,10 @@ const STATUS_COLORS: Record<string, string> = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function isValidEmail(email: string) {
   return EMAIL_REGEX.test(email);
+}
+
+function isValidPhone(phone: string) {
+  return /^\+[1-9]\d{6,14}$/.test(phone);
 }
 
 function StatCard({ icon, label, value, sub, color }: { icon: React.ReactNode; label: string; value: string; sub?: string; color: string }) {
@@ -96,7 +103,15 @@ function StatusBadge({ status }: { status: string }) {
   return null;
 }
 
-function ContactTable({ contacts, label, emptyMsg }: { contacts: BroadcastContact[]; label: string; emptyMsg: string }) {
+function ContactTable({
+  contacts,
+  primaryLabel,
+  secondaryLabel,
+}: {
+  contacts: BroadcastContact[];
+  primaryLabel: string;
+  secondaryLabel?: string;
+}) {
   if (contacts.length === 0) return null;
   return (
     <div className="overflow-x-auto border rounded-lg">
@@ -104,18 +119,24 @@ function ContactTable({ contacts, label, emptyMsg }: { contacts: BroadcastContac
         <thead>
           <tr className="border-b bg-muted/40">
             <th className="text-left px-4 py-2.5 font-medium text-muted-foreground w-12">#</th>
-            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Email</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">{primaryLabel}</th>
             <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Name</th>
+            {secondaryLabel && <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">{secondaryLabel}</th>}
             <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Status</th>
             <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Sent At</th>
           </tr>
         </thead>
         <tbody>
           {contacts.map((c, i) => (
-            <tr key={c.email} className={`border-b last:border-0 ${i % 2 === 0 ? "" : "bg-muted/20"}`}>
+            <tr key={`${c.email ?? c.phoneNumber ?? "contact"}-${i}`} className={`border-b last:border-0 ${i % 2 === 0 ? "" : "bg-muted/20"}`}>
               <td className="px-4 py-3 text-muted-foreground text-xs">{i + 1}</td>
-              <td className="px-4 py-3 font-mono text-xs">{c.email}</td>
+              <td className="px-4 py-3 font-mono text-xs">{c.email ?? c.phoneNumber ?? "—"}</td>
               <td className="px-4 py-3 text-muted-foreground">{c.name || "—"}</td>
+              {secondaryLabel && (
+                <td className="px-4 py-3 text-muted-foreground text-xs">
+                  {c.email && c.phoneNumber ? (primaryLabel === "Email" ? c.phoneNumber : c.email) : "—"}
+                </td>
+              )}
               <td className="px-4 py-3">{c.queueStatus ? <StatusBadge status={c.queueStatus} /> : <span className="text-xs text-muted-foreground">—</span>}</td>
               <td className="px-4 py-3 text-muted-foreground text-xs">{c.sentAt ? new Date(c.sentAt).toLocaleString() : "—"}</td>
             </tr>
@@ -126,7 +147,17 @@ function ContactTable({ contacts, label, emptyMsg }: { contacts: BroadcastContac
   );
 }
 
-function RemovedSection({ contacts, label }: { contacts: BroadcastContact[]; label: string }) {
+function RemovedSection({
+  contacts,
+  label,
+  primaryLabel,
+  getReason,
+}: {
+  contacts: BroadcastContact[];
+  label: string;
+  primaryLabel: string;
+  getReason: (contact: BroadcastContact) => string;
+}) {
   if (contacts.length === 0) return null;
   return (
     <Card>
@@ -141,19 +172,19 @@ function RemovedSection({ contacts, label }: { contacts: BroadcastContact[]; lab
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40">
-                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Email</th>
+                <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">{primaryLabel}</th>
                 <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Name</th>
                 <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Reason</th>
               </tr>
             </thead>
             <tbody>
               {contacts.map((c, i) => (
-                <tr key={c.email} className={`border-b last:border-0 ${i % 2 === 0 ? "" : "bg-muted/20"}`}>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground line-through">{c.email}</td>
+                <tr key={`${c.email ?? c.phoneNumber ?? "removed"}-${i}`} className={`border-b last:border-0 ${i % 2 === 0 ? "" : "bg-muted/20"}`}>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground line-through">{c.email ?? c.phoneNumber ?? "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground">{c.name || "—"}</td>
                   <td className="px-4 py-3">
                     <Badge variant="outline" className="text-xs text-red-600 border-red-300 dark:border-red-700">
-                      {!isValidEmail(c.email) ? "Invalid email" : "Not in audience"}
+                      {getReason(c)}
                     </Badge>
                   </td>
                 </tr>
@@ -223,10 +254,24 @@ export default function BroadcastDetail() {
   }
 
   const b = detail.broadcast;
-  const openPct = b.totalRecipients > 0 ? Math.round((b.openCount / b.totalRecipients) * 100) : 0;
+  const isWhatsApp = b.channel === "whatsapp";
+  const openCount = b.openCount ?? 0;
+  const totalOpenCount = b.totalOpenCount ?? 0;
+  const openPct = b.totalRecipients > 0 ? Math.round((openCount / b.totalRecipients) * 100) : 0;
 
-  const validContacts = detail.contacts.filter(c => isValidEmail(c.email));
-  const invalidContacts = detail.contacts.filter(c => !isValidEmail(c.email));
+  const validContacts = detail.contacts.filter((c) =>
+    isWhatsApp
+      ? (!!c.phoneNumber && isValidPhone(c.phoneNumber))
+      : (!!c.email && isValidEmail(c.email))
+  );
+  const missingPrimaryContacts = detail.contacts.filter((c) =>
+    isWhatsApp ? !c.phoneNumber : !c.email
+  );
+  const invalidContacts = detail.contacts.filter((c) =>
+    isWhatsApp
+      ? (!!c.phoneNumber && !isValidPhone(c.phoneNumber))
+      : (!!c.email && !isValidEmail(c.email))
+  );
 
   const opened = validContacts.filter(c => c.queueStatus === "Opened");
   const sent = validContacts.filter(c => c.queueStatus === "Sent");
@@ -236,23 +281,23 @@ export default function BroadcastDetail() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-semibold truncate">{b.name}</h1>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[b.status] ?? ""}`}>{b.status}</span>
-          </div>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {b.audienceName} &middot; {b.templateName}
-            {b.subjectOverride && ` — "${b.subjectOverride}"`}
-          </p>
-        </div>
+      <BreadcrumbLabel>{b.name}</BreadcrumbLabel>
+      <PageActions>
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[b.status] ?? ""}`}>{b.status}</span>
+      </PageActions>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <p className="font-medium">{b.name}</p>
+        <span className="text-xs text-muted-foreground">
+          {b.audienceName} &middot; {b.templateName}
+          {b.subjectOverride && ` — "${b.subjectOverride}"`}
+        </span>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard icon={<Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />} label="Sent" value={`${b.sentCount}/${b.totalRecipients}`} color="bg-blue-100 dark:bg-blue-900/30" />
-        <StatCard icon={<MailOpen className="h-4 w-4 text-green-600 dark:text-green-400" />} label="Unique Opens" value={`${b.openCount}/${b.totalRecipients}`} sub={`${openPct}% open rate`} color="bg-green-100 dark:bg-green-900/30" />
-        <StatCard icon={<Mail className="h-4 w-4 text-violet-600 dark:text-violet-400" />} label="Total Opens" value={`${b.totalOpenCount}`} sub="including re-opens" color="bg-violet-100 dark:bg-violet-900/30" />
+        <StatCard icon={<MailOpen className="h-4 w-4 text-green-600 dark:text-green-400" />} label="Unique Opens" value={`${openCount}/${b.totalRecipients}`} sub={`${openPct}% open rate`} color="bg-green-100 dark:bg-green-900/30" />
+        <StatCard icon={<Mail className="h-4 w-4 text-violet-600 dark:text-violet-400" />} label="Total Opens" value={`${totalOpenCount}`} sub="including re-opens" color="bg-violet-100 dark:bg-violet-900/30" />
         <StatCard icon={<XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />} label="Failed" value={`${b.failedCount}/${b.totalRecipients}`} color="bg-red-100 dark:bg-red-900/30" />
       </div>
 
@@ -264,6 +309,11 @@ export default function BroadcastDetail() {
               <Badge variant="outline" className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-300 dark:border-green-700">
                 {validContacts.length} valid
               </Badge>
+              {missingPrimaryContacts.length > 0 && (
+                <Badge variant="outline" className="bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700">
+                  {missingPrimaryContacts.length} missing {isWhatsApp ? "number" : "email"}
+                </Badge>
+              )}
               {detail.invalidCount > 0 && (
                 <Badge variant="outline" className="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-300 dark:border-red-700">
                   {detail.invalidCount} invalid
@@ -287,7 +337,7 @@ export default function BroadcastDetail() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <ContactTable contacts={opened} label="Opened" emptyMsg="" />
+            <ContactTable contacts={opened} primaryLabel={isWhatsApp ? "WhatsApp Number" : "Email"} secondaryLabel={isWhatsApp ? "Email" : "Phone"} />
           </CardContent>
         </Card>
       )}
@@ -300,7 +350,7 @@ export default function BroadcastDetail() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <ContactTable contacts={sent} label="Sent" emptyMsg="" />
+            <ContactTable contacts={sent} primaryLabel={isWhatsApp ? "WhatsApp Number" : "Email"} secondaryLabel={isWhatsApp ? "Email" : "Phone"} />
           </CardContent>
         </Card>
       )}
@@ -313,7 +363,7 @@ export default function BroadcastDetail() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <ContactTable contacts={pending} label="Pending" emptyMsg="" />
+            <ContactTable contacts={pending} primaryLabel={isWhatsApp ? "WhatsApp Number" : "Email"} secondaryLabel={isWhatsApp ? "Email" : "Phone"} />
           </CardContent>
         </Card>
       )}
@@ -326,7 +376,7 @@ export default function BroadcastDetail() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <ContactTable contacts={failed} label="Failed" emptyMsg="" />
+            <ContactTable contacts={failed} primaryLabel={isWhatsApp ? "WhatsApp Number" : "Email"} secondaryLabel={isWhatsApp ? "Email" : "Phone"} />
           </CardContent>
         </Card>
       )}
@@ -344,17 +394,31 @@ export default function BroadcastDetail() {
               </Button>
             </CardTitle>
             <p className="text-xs text-muted-foreground mt-1">
-              These contacts have valid emails but were not yet queued for this broadcast.
+              These contacts have valid {isWhatsApp ? "phone numbers" : "emails"} but were not yet queued for this broadcast.
             </p>
           </CardHeader>
           <CardContent className="p-0">
-            <ContactTable contacts={notQueued} label="Not Sent" emptyMsg="" />
+            <ContactTable contacts={notQueued} primaryLabel={isWhatsApp ? "WhatsApp Number" : "Email"} secondaryLabel={isWhatsApp ? "Email" : "Phone"} />
           </CardContent>
         </Card>
       )}
 
+      {missingPrimaryContacts.length > 0 && (
+        <RemovedSection
+          contacts={missingPrimaryContacts}
+          label={isWhatsApp ? "Missing WhatsApp Number" : "Missing Email"}
+          primaryLabel={isWhatsApp ? "WhatsApp Number" : "Email"}
+          getReason={() => isWhatsApp ? "Missing WhatsApp number" : "Missing email"}
+        />
+      )}
+
       {invalidContacts.length > 0 && (
-        <RemovedSection contacts={invalidContacts} label="Removed Contacts" />
+        <RemovedSection
+          contacts={invalidContacts}
+          label="Removed Contacts"
+          primaryLabel={isWhatsApp ? "WhatsApp Number" : "Email"}
+          getReason={() => isWhatsApp ? "Invalid WhatsApp number" : "Invalid email"}
+        />
       )}
     </div>
   );

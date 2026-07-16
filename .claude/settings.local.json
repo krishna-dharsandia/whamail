@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh release:*)",
+      "Bash(ls:*)",
+      "Bash(cd:*)",
+      "Bash(sleep:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "WebFetch(domain:signpath.io)",
+      "WebFetch(domain:about.signpath.io)",
+      "WebFetch(domain:signpath.org)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(curl:*)",
+      "Bash(git filter-repo:*)"
+    ]
+  }
+}

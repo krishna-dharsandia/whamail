@@ -1,6 +1,6 @@
 using System.Security.Claims;
 
-namespace MailBridge.API.Services;
+namespace Whamail.API.Services;
 
 /// <summary>
 /// Provides the current authenticated user's ID to the DbContext for RLS global query filters.

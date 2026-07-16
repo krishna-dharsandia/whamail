@@ -1,5 +1,5 @@
-using MailBridge.API.Data;
-using MailBridge.API.Services;
+using Whamail.API.Data;
+using Whamail.API.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -55,6 +55,7 @@ builder.Services.AddScoped<IAudienceService, AudienceService>();
 builder.Services.AddScoped<IBroadcastService, BroadcastService>();
 builder.Services.AddScoped<IMetricsService, MetricsService>();
 builder.Services.AddScoped<IWhatsAppService, WhatsAppService>();
+builder.Services.AddScoped<IFileService, FileService>();
 
 // ===== Background Worker =====
 builder.Services.AddHostedService<EmailWorkerService>();

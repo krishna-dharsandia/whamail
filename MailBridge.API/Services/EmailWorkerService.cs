@@ -1,11 +1,12 @@
+using System.Text.Json;
 using MailKit.Net.Smtp;
 using MailKit.Security;
-using MailBridge.API.Data;
-using MailBridge.API.Models;
+using Whamail.API.Data;
+using Whamail.API.Models;
 using Microsoft.EntityFrameworkCore;
 using MimeKit;
 
-namespace MailBridge.API.Services;
+namespace Whamail.API.Services;
 
 public class EmailWorkerService : BackgroundService
 {
@@ -45,6 +46,7 @@ public class EmailWorkerService : BackgroundService
         using var scope = _serviceProvider.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<MailBridgeDbContext>();
         var encryption = scope.ServiceProvider.GetRequiredService<IEncryptionService>();
+        var fileService = scope.ServiceProvider.GetRequiredService<IFileService>();
 
         // Get batch of pending emails (up to 20 at a time) - skip WhatsApp items
         var pendingEmails = await db.EmailQueues
@@ -105,6 +107,20 @@ public class EmailWorkerService : BackgroundService
                 await smtpClient.ConnectAsync(credential.SmtpHost, credential.SmtpPort, SecureSocketOptions.StartTls, ct);
                 await smtpClient.AuthenticateAsync(credential.GmailAddress, decryptedPassword, ct);
 
+                // Pre-load attachment files for templates used in this group
+                var templateIds = group
+                    .Where(e => e.TemplateId != null)
+                    .Select(e => e.TemplateId!.Value)
+                    .Distinct()
+                    .ToList();
+                var templates = templateIds.Count > 0
+                    ? await db.EmailTemplates
+                        .Where(t => templateIds.Contains(t.Id))
+                        .ToDictionaryAsync(t => t.Id, ct)
+                    : new Dictionary<Guid, EmailTemplate>();
+
+                var fileStoragePath = fileService.GetStoragePath();
+
                 foreach (var email in group)
                 {
                     try
@@ -115,6 +131,29 @@ public class EmailWorkerService : BackgroundService
                         message.Subject = email.Subject;
 
                         var bodyBuilder = new BodyBuilder { HtmlBody = email.Body };
+
+                        // Add attachments from template
+                        if (email.TemplateId != null && templates.TryGetValue(email.TemplateId.Value, out var tmpl) && !string.IsNullOrEmpty(tmpl.AttachmentFileIds))
+                        {
+                            try
+                            {
+                                var fileIds = JsonSerializer.Deserialize<List<Guid>>(tmpl.AttachmentFileIds);
+                                if (fileIds != null)
+                                {
+                                    var files = await fileService.GetByIdsAsync(fileIds);
+                                    foreach (var file in files)
+                                    {
+                                        var filePath = Path.Combine(fileStoragePath, file.StoredName);
+                                        if (File.Exists(filePath))
+                                        {
+                                            bodyBuilder.Attachments.Add(file.OriginalName, await File.ReadAllBytesAsync(filePath, ct));
+                                        }
+                                    }
+                                }
+                            }
+                            catch { /* non-fatal: skip attachments on parse error */ }
+                        }
+
                         message.Body = bodyBuilder.ToMessageBody();
 
                         await smtpClient.SendAsync(message, ct);

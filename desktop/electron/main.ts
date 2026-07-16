@@ -19,6 +19,13 @@ let isQuitting = false;
 const PROTOCOL = "app";
 const OUT_DIR = join(__dirname, "..", "out");
 
+// Dynamic route patterns mapped to their generateStaticParams placeholder paths.
+// When static export can't resolve a path, fall back to the placeholder page
+// which handles routing client-side via useParams().
+const DYNAMIC_ROUTE_FALLBACKS: [RegExp, string][] = [
+  [/^broadcast\/[^/]+$/, "broadcast/placeholder"],
+];
+
 function registerAppProtocol() {
   protocol.handle(PROTOCOL, (request) => {
     const url = new URL(request.url);
@@ -45,6 +52,18 @@ function registerAppProtocol() {
       const withIndex = join(OUT_DIR, pathname, "index.html");
       if (existsSync(withIndex)) {
         filePath = withIndex;
+      } else {
+        // Try dynamic route fallbacks for SPA-like navigation
+        const cleanPath = pathname.replace(/\/index\.html$/, "").replace(/\/$/, "");
+        for (const [pattern, fallback] of DYNAMIC_ROUTE_FALLBACKS) {
+          if (pattern.test(cleanPath)) {
+            const fallbackPath = join(OUT_DIR, fallback, "index.html");
+            if (existsSync(fallbackPath)) {
+              filePath = fallbackPath;
+              break;
+            }
+          }
+        }
       }
     }
 

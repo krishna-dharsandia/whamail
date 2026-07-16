@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace MailBridge.API.Models;
+namespace Whamail.API.Models;
 
 [Table("email_templates")]
 public class EmailTemplate
@@ -29,6 +29,10 @@ public class EmailTemplate
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    [Column("attachment_file_ids")]
+    [MaxLength(2000)]
+    public string? AttachmentFileIds { get; set; }
 
     [Column("updated_at")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

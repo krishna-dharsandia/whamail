@@ -1,7 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-namespace MailBridge.API.Models;
+namespace Whamail.API.Models;
 
 [Table("audiences")]
 public class Audience
@@ -17,6 +17,10 @@ public class Audience
     [Required]
     [MaxLength(255)]
     public string Name { get; set; } = string.Empty;
+
+    [Column("type")]
+    [MaxLength(20)]
+    public string Type { get; set; } = "email";
 
     [Column("created_at")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

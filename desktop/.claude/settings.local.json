@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(taskkill:*)",
+      "Bash(powershell -Command \"Get-Process | Where-Object { \\\\$_.Path -like '*whamail*' -or \\\\$_.Path -like '*win-unpacked*' } | Select-Object Id, ProcessName, Path\" 2>&1)",
+      "Bash(powershell -Command \"Get-Process | Where-Object { \\\\$_.Path -like '*whamail*' -or \\\\$_.Path -like '*win-unpacked*' }\" 2>&1)",
+      "Bash(start:*)",
+      "Bash(powershell -Command \"Get-Process | Where-Object { \\\\$_.Modules.FileName -like '*app.asar*' } | Select Id, ProcessName\" 2>&1; handle=\"E:/whamail/desktop/release/win-unpacked/resources/app.asar\"; powershell -Command \"[System.IO.File]::Open\\('E:\\\\\\\\whamail\\\\\\\\desktop\\\\\\\\release\\\\\\\\win-unpacked\\\\\\\\resources\\\\\\\\app.asar', 'Open', 'Read', 'Delete'\\)\" 2>&1)",
+      "Bash(powershell -Command \"Get-Process | Select-Object Id, ProcessName | Format-Table\" 2>&1 | grep -i \"electron\\\\|whamail\\\\|node\\\\|7z\\\\|mail\")",
+      "Bash(powershell -Command \"Remove-Item -Path 'E:\\\\\\\\whamail\\\\\\\\desktop\\\\\\\\release\\\\\\\\win-unpacked' -Recurse -Force -ErrorAction SilentlyContinue\" 2>&1; sleep 3; ls \"E:/whamail/desktop/release/win-unpacked\" 2>&1)",
+      "Bash(powershell -Command \"Remove-Item -Path 'E:\\\\\\\\whamail\\\\\\\\desktop\\\\\\\\release\\\\\\\\win-unpacked\\\\\\\\resources\\\\\\\\app.asar' -Force\" 2>&1)",
+      "Bash(powershell -Command \"& { \\\\$handle = \\(Get-Process | ForEach-Object { \\\\$p = \\\\$_; \\\\$p.HandleCount } | Measure-Object -Sum\\).Sum; Write-Host \\\\\"Total handles: \\\\$handle\\\\\" }; Get-Process | Sort-Object HandleCount -Descending | Select-Object -First 20 Id, ProcessName, HandleCount\" 2>&1)",
+      "Bash(powershell -Command \"Get-ItemProperty -Path 'HKCU:\\\\\\\\Software\\\\\\\\Classes\\\\\\\\whamail' -ErrorAction SilentlyContinue | Format-List\" 2>&1)",
+      "Bash(powershell -Command \"Get-ChildItem -Path 'HKCU:\\\\\\\\Software\\\\\\\\Classes\\\\\\\\whamail' -Recurse | Format-List\" 2>&1)",
+      "Bash(powershell -Command \"\\(Get-Item 'E:\\\\\\\\whamail\\\\\\\\desktop\\\\\\\\release\\\\\\\\build\\\\\\\\win-unpacked\\\\\\\\Whamail.exe'\\).VersionInfo | Format-List\" 2>&1)",
+      "Bash(powershell -Command \"Remove-Item -Path 'HKCU:\\\\\\\\Software\\\\\\\\Classes\\\\\\\\whamail' -Recurse -Force -ErrorAction SilentlyContinue\" 2>&1)",
+      "Bash(powershell -Command \"Remove-Item -Path 'E:\\\\\\\\whamail\\\\\\\\desktop\\\\\\\\release' -Recurse -Force -ErrorAction SilentlyContinue\" 2>&1; sleep 3; bunx electron-builder --win --x64 2>&1)",
+      "Bash(powershell -Command \"Get-Process | Where-Object { \\\\$_.Path -like '*whamail*' -or \\\\$_.Path -like '*win-unpacked*' -or \\\\$_.Path -like '*7za*' }\" 2>&1)",
+      "Bash(powershell -Command \"Rename-Item 'E:\\\\\\\\whamail\\\\\\\\desktop\\\\\\\\release' 'E:\\\\\\\\whamail\\\\\\\\desktop\\\\\\\\release-old' -Force\" 2>&1; sleep 2; bunx electron-builder --win --x64 2>&1)",
+      "Bash(powershell -Command \"Add-MpExclusion -Path 'E:\\\\\\\\whamail\\\\\\\\desktop\\\\\\\\release'\" 2>&1)",
+      "Bash(powershell -Command \"Start-Process powershell -Verb RunAs -ArgumentList '-Command Add-MpExclusion -Path E:\\\\\\\\whamail\\\\\\\\desktop\\\\\\\\release'\" 2>&1; sleep 5; rm -rf \"E:/whamail/desktop/release/win-unpacked\" \"E:/whamail/desktop/release/build\" 2>&1)",
+      "Bash(powershell -Command \"& { \\\\$handle = [System.Diagnostics.Process]::GetProcesses\\(\\) | ForEach-Object { try { \\\\$_.Modules } catch {} } | Where-Object { \\\\$_.FileName -like '*app.asar*' }; \\\\$handle }\" 2>&1)"
+    ]
+  }
+}

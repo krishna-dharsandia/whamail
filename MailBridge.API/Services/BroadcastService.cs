@@ -1,10 +1,10 @@
 using System.Text.RegularExpressions;
-using MailBridge.API.Data;
-using MailBridge.API.DTOs;
-using MailBridge.API.Models;
+using Whamail.API.Data;
+using Whamail.API.DTOs;
+using Whamail.API.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace MailBridge.API.Services;
+namespace Whamail.API.Services;
 
 public interface IBroadcastService
 {
@@ -127,6 +127,15 @@ public class BroadcastService : IBroadcastService
         // Verify audience belongs to user
         var audience = await _db.Audiences.FirstOrDefaultAsync(a => a.Id == request.AudienceId && a.UserId == userId)
             ?? throw new InvalidOperationException("Audience not found.");
+
+        var requiredAudienceType = request.Channel == "whatsapp" ? "whatsapp" : "email";
+        if (!string.Equals(audience.Type, requiredAudienceType, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                request.Channel == "whatsapp"
+                    ? "Choose a WhatsApp audience for WhatsApp broadcasts."
+                    : "Choose an email audience for email broadcasts.");
+        }
 
         // Verify template belongs to user
         var template = await _db.EmailTemplates.FirstOrDefaultAsync(t => t.Id == request.TemplateId && t.UserId == userId)

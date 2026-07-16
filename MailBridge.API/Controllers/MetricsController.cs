@@ -1,9 +1,9 @@
 using System.Security.Claims;
-using MailBridge.API.Services;
+using Whamail.API.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace MailBridge.API.Controllers;
+namespace Whamail.API.Controllers;
 
 [ApiController]
 [Authorize]

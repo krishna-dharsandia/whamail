@@ -23,6 +23,7 @@ interface UseWhatsAppReturn {
   info: WhatsAppInfo | null;
   detail: string | null;
   sendProgress: SendProgress | null;
+  isElectron: boolean;
   connect: () => Promise<{ success: boolean; error?: string }>;
   disconnect: () => Promise<{ success: boolean }>;
   sendMessage: (phone: string, message: string) => Promise<{ success: boolean; error?: string; messageId?: string }>;
@@ -45,9 +46,15 @@ export function useWhatsApp(): UseWhatsAppReturn {
   const [sendProgress, setSendProgress] = useState<SendProgress | null>(null);
   const cleanupRefs = useRef<Array<() => void>>([]);
 
+  const isElectron = typeof window !== "undefined" && !!(window as any).electronAPI?.whatsapp;
+
   useEffect(() => {
     const wa = getElectronWhatsApp();
-    if (!wa) return;
+    if (!wa) {
+      // Web mode: try to load session status from backend API
+      loadWebStatus();
+      return;
+    }
 
     wa.getStatus().then((data: { status: WhatsAppStatus; qr: string | null }) => {
       setStatus(data.status);
@@ -84,9 +91,26 @@ export function useWhatsApp(): UseWhatsAppReturn {
     };
   }, []);
 
+  async function loadWebStatus() {
+    try {
+      const { whatsappApi } = await import("@/lib/api");
+      const res = await whatsappApi.getSession();
+      if (res.data) {
+        setStatus("ready");
+        setInfo({
+          name: res.data.pushName ?? "",
+          phone: res.data.phoneNumber ?? "",
+          platform: res.data.platform ?? "",
+        });
+      }
+    } catch {
+      // No session — that's fine
+    }
+  }
+
   const connect = useCallback(async () => {
     const wa = getElectronWhatsApp();
-    if (!wa) return { success: false, error: "Not running in Electron" };
+    if (!wa) return { success: false, error: "WhatsApp connection requires the desktop app. Open Whamail desktop to connect." };
     return wa.connect();
   }, []);
 
@@ -98,13 +122,13 @@ export function useWhatsApp(): UseWhatsAppReturn {
 
   const sendMessage = useCallback(async (phone: string, message: string) => {
     const wa = getElectronWhatsApp();
-    if (!wa) return { success: false, error: "Not running in Electron" };
+    if (!wa) return { success: false, error: "Sending requires the desktop app." };
     return wa.sendMessage(phone, message);
   }, []);
 
   const sendBatch = useCallback(async (messages: Array<{ phone: string; message: string }>) => {
     const wa = getElectronWhatsApp();
-    if (!wa) return { success: false, error: "Not running in Electron" };
+    if (!wa) return { success: false, error: "Sending requires the desktop app." };
     return wa.sendBatch(messages);
   }, []);
 
@@ -114,7 +138,7 @@ export function useWhatsApp(): UseWhatsAppReturn {
     return wa.checkNumber(phone);
   }, []);
 
-  const getInfo = useCallback(async () => {
+  const getInfoCb = useCallback(async () => {
     const wa = getElectronWhatsApp();
     if (!wa) return null;
     return wa.getInfo();
@@ -126,11 +150,12 @@ export function useWhatsApp(): UseWhatsAppReturn {
     info,
     detail,
     sendProgress,
+    isElectron,
     connect,
     disconnect,
     sendMessage,
     sendBatch,
     checkNumber,
-    getInfo,
+    getInfo: getInfoCb,
   };
 }

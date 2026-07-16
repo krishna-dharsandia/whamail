@@ -25,6 +25,7 @@ interface Credential {
 
 export default function SettingsPage() {
   const { status: waStatus, info: waInfo, disconnect: waDisconnect } = useWhatsApp();
+  const [activeTab, setActiveTab] = useState<"email" | "whatsapp">("email");
   const [credential, setCredential] = useState<Credential | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -119,224 +120,254 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Settings</h1>
-        <p className="text-muted-foreground text-sm mt-1">Configure your Gmail sending credentials.</p>
-      </div>
-
-      {credential ? (
-        <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950 px-4 py-3">
-          <div className="flex items-center gap-2 text-sm text-green-800 dark:text-green-200">
-            <Wifi className="h-4 w-4" />
-            <span>Connected as <strong>{credential.gmailAddress}</strong></span>
-          </div>
-          <Badge variant="outline" className="text-green-700 border-green-300 dark:text-green-300">Active</Badge>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+    <div className="flex gap-6 max-w-3xl">
+      {/* Tab nav - vertical on left */}
+      <div className="flex flex-col gap-1 w-40 shrink-0">
+        <button
+          onClick={() => setActiveTab("email")}
+          className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors text-left ${
+            activeTab === "email"
+              ? "bg-muted font-medium"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          }`}
+        >
           <Mail className="h-4 w-4" />
-          <span>No Gmail credentials configured. Add your Gmail app password to start sending.</span>
-        </div>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Gmail Configuration</CardTitle>
-          <CardDescription>
-            Use a Gmail App Password — not your regular password.{" "}
-            <a
-              href="https://support.google.com/accounts/answer/185833"
-              target="_blank"
-              rel="noreferrer"
-              className="underline hover:no-underline"
-            >
-              How to create one
-            </a>
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSave} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="gmailAddress">Gmail Address</Label>
-              <Input
-                id="gmailAddress"
-                type="email"
-                placeholder="you@gmail.com"
-                value={form.gmailAddress}
-                onChange={(e) => setForm((f) => ({ ...f, gmailAddress: e.target.value }))}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="appPassword">App Password</Label>
-              <div className="relative">
-                <Input
-                  id="appPassword"
-                  type={showPassword ? "text" : "password"}
-                  placeholder={credential ? "Enter new password to update" : "xxxx xxxx xxxx xxxx"}
-                  value={form.appPassword}
-                  onChange={(e) => setForm((f) => ({ ...f, appPassword: e.target.value }))}
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  onClick={() => setShowPassword((v) => !v)}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              <p className="text-xs text-muted-foreground">Stored encrypted. Never shared or logged.</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="displayName">Display Name</Label>
-              <div className="relative">
-                <Input
-                  id="displayName"
-                  type="text"
-                  placeholder="Whamail"
-                  value={form.displayName}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, displayName: e.target.value }))
-                  }
-                  className="pr-10"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                This name will appear as the sender in emails.
-              </p>
-            </div>
-
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="smtpHost">SMTP Host</Label>
-                <Input
-                  id="smtpHost"
-                  value={form.smtpHost}
-                  onChange={(e) => setForm((f) => ({ ...f, smtpHost: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="smtpPort">SMTP Port</Label>
-                <Input
-                  id="smtpPort"
-                  type="number"
-                  value={form.smtpPort}
-                  onChange={(e) => setForm((f) => ({ ...f, smtpPort: Number(e.target.value) }))}
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <Button type="submit" disabled={saving}>
-                {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                {credential ? "Update" : "Save"} Settings
-              </Button>
-              {credential && (
-                <Button type="button" variant="outline" onClick={() => setShowTestForm((v) => !v)}>
-                  <Wifi className="h-4 w-4 mr-2" />
-                  Test Connection
-                </Button>
-              )}
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      {showTestForm && credential && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Send Test Email</CardTitle>
-            <CardDescription>Verify your configuration sends a real email.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleTest} className="flex gap-2">
-              <Input
-                type="email"
-                placeholder="recipient@example.com"
-                value={testEmail}
-                onChange={(e) => setTestEmail(e.target.value)}
-                className="flex-1"
-              />
-              <Button type="submit" disabled={testing}>
-                {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send Test"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      {credential && (
-        <>
-          <Separator />
-          <div>
-            <h2 className="text-sm font-medium text-destructive mb-2">Danger Zone</h2>
-            <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
-              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
-              Remove Gmail Credentials
-            </Button>
-          </div>
-        </>
-      )}
-
-      <Separator />
-
-      <div>
-        <h1 className="text-2xl font-semibold">WhatsApp</h1>
-        <p className="text-muted-foreground text-sm mt-1">Manage your WhatsApp connection for broadcast messaging.</p>
+          Email
+        </button>
+        <button
+          onClick={() => setActiveTab("whatsapp")}
+          className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors text-left ${
+            activeTab === "whatsapp"
+              ? "bg-muted font-medium"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+          }`}
+        >
+          <MessageCircle className="h-4 w-4" />
+          WhatsApp
+        </button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <MessageCircle className="h-4 w-4" /> WhatsApp Connection
-          </CardTitle>
-          <CardDescription>
-            Connect your WhatsApp account to send broadcast messages via WhatsApp Web.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {waStatus === "ready" && waInfo ? (
-            <div className="space-y-3">
+      {/* Tab content */}
+      <div className="flex-1 space-y-6">
+        {activeTab === "email" && (
+          <>
+            {credential ? (
               <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950 px-4 py-3">
                 <div className="flex items-center gap-2 text-sm text-green-800 dark:text-green-200">
                   <Wifi className="h-4 w-4" />
-                  <span>Connected as <strong>{waInfo.name}</strong> (+{waInfo.phone})</span>
+                  <span>Connected as <strong>{credential.gmailAddress}</strong></span>
                 </div>
                 <Badge variant="outline" className="text-green-700 border-green-300 dark:text-green-300">Active</Badge>
               </div>
-              <div className="flex gap-2">
-                <Button asChild size="sm">
-                  <Link href="/whatsapp">
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Manage Connection
-                  </Link>
-                </Button>
-                <Button variant="outline" size="sm" onClick={async () => { await waDisconnect(); toast.info("WhatsApp disconnected"); }}>
-                  <WifiOff className="h-4 w-4 mr-2" />
-                  Disconnect
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
+            ) : (
               <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
-                <WifiOff className="h-4 w-4" />
-                <span>WhatsApp is not connected. Connect to send WhatsApp broadcasts.</span>
+                <Mail className="h-4 w-4" />
+                <span>No Gmail credentials configured. Add your Gmail app password to start sending.</span>
               </div>
-              <Button asChild size="sm">
-                <Link href="/whatsapp">
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  Connect WhatsApp
-                </Link>
-              </Button>
+            )}
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Gmail Configuration</CardTitle>
+                <CardDescription>
+                  Use a Gmail App Password — not your regular password.{" "}
+                  <a
+                    href="https://support.google.com/accounts/answer/185833"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline hover:no-underline"
+                  >
+                    How to create one
+                  </a>
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSave} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="gmailAddress">Gmail Address</Label>
+                    <Input
+                      id="gmailAddress"
+                      type="email"
+                      placeholder="you@gmail.com"
+                      value={form.gmailAddress}
+                      onChange={(e) => setForm((f) => ({ ...f, gmailAddress: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="appPassword">App Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="appPassword"
+                        type={showPassword ? "text" : "password"}
+                        placeholder={credential ? "Enter new password to update" : "xxxx xxxx xxxx xxxx"}
+                        value={form.appPassword}
+                        onChange={(e) => setForm((f) => ({ ...f, appPassword: e.target.value }))}
+                        className="pr-10"
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        onClick={() => setShowPassword((v) => !v)}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Stored encrypted. Never shared or logged.</p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="displayName">Display Name</Label>
+                    <div className="relative">
+                      <Input
+                        id="displayName"
+                        type="text"
+                        placeholder="Whamail"
+                        value={form.displayName}
+                        onChange={(e) =>
+                          setForm((f) => ({ ...f, displayName: e.target.value }))
+                        }
+                        className="pr-10"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      This name will appear as the sender in emails.
+                    </p>
+                  </div>
+
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="smtpHost">SMTP Host</Label>
+                      <Input
+                        id="smtpHost"
+                        value={form.smtpHost}
+                        onChange={(e) => setForm((f) => ({ ...f, smtpHost: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="smtpPort">SMTP Port</Label>
+                      <Input
+                        id="smtpPort"
+                        type="number"
+                        value={form.smtpPort}
+                        onChange={(e) => setForm((f) => ({ ...f, smtpPort: Number(e.target.value) }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button type="submit" disabled={saving}>
+                      {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                      {credential ? "Update" : "Save"} Settings
+                    </Button>
+                    {credential && (
+                      <Button type="button" variant="outline" onClick={() => setShowTestForm((v) => !v)}>
+                        <Wifi className="h-4 w-4 mr-2" />
+                        Test Connection
+                      </Button>
+                    )}
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            {showTestForm && credential && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Send Test Email</CardTitle>
+                  <CardDescription>Verify your configuration sends a real email.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleTest} className="flex gap-2">
+                    <Input
+                      type="email"
+                      placeholder="recipient@example.com"
+                      value={testEmail}
+                      onChange={(e) => setTestEmail(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button type="submit" disabled={testing}>
+                      {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Send Test"}
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
+            )}
+
+            {credential && (
+              <>
+                <Separator />
+                <div>
+                  <h2 className="text-sm font-medium text-destructive mb-2">Danger Zone</h2>
+                  <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
+                    {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+                    Remove Gmail Credentials
+                  </Button>
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {activeTab === "whatsapp" && (
+          <>
+            <div>
+              <h1 className="text-2xl font-semibold">WhatsApp</h1>
+              <p className="text-muted-foreground text-sm mt-1">Manage your WhatsApp connection for broadcast messaging.</p>
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <MessageCircle className="h-4 w-4" /> WhatsApp Connection
+                </CardTitle>
+                <CardDescription>
+                  Connect your WhatsApp account to send broadcast messages via WhatsApp Web.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {waStatus === "ready" && waInfo ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950 px-4 py-3">
+                      <div className="flex items-center gap-2 text-sm text-green-800 dark:text-green-200">
+                        <Wifi className="h-4 w-4" />
+                        <span>Connected as <strong>{waInfo.name}</strong> (+{waInfo.phone})</span>
+                      </div>
+                      <Badge variant="outline" className="text-green-700 border-green-300 dark:text-green-300">Active</Badge>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button asChild size="sm">
+                        <Link href="/whatsapp">
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Manage Connection
+                        </Link>
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={async () => { await waDisconnect(); toast.info("WhatsApp disconnected"); }}>
+                        <WifiOff className="h-4 w-4 mr-2" />
+                        Disconnect
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+                      <WifiOff className="h-4 w-4" />
+                      <span>WhatsApp is not connected. Connect to send WhatsApp broadcasts.</span>
+                    </div>
+                    <Button asChild size="sm">
+                      <Link href="/whatsapp">
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        Connect WhatsApp
+                      </Link>
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </div>
     </div>
   );
 }

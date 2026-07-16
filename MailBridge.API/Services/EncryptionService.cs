@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
-namespace MailBridge.API.Services;
+namespace Whamail.API.Services;
 
 public interface IEncryptionService
 {

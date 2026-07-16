@@ -1,4 +1,4 @@
-namespace MailBridge.API.DTOs;
+namespace Whamail.API.DTOs;
 
 // ===== Auth / User =====
 public record SyncProfileRequest(string? FullName, string? AvatarUrl, string AuthProvider = "email");
@@ -17,9 +17,19 @@ public record WhatsAppSendMessageRequest(string Phone, string Message);
 public record WhatsAppSendBatchRequest(List<WhatsAppSendMessageRequest> Messages);
 
 // ===== Email Templates =====
-public record CreateTemplateRequest(string Name, string SubjectTemplate, string BodyTemplate);
-public record UpdateTemplateRequest(string Name, string SubjectTemplate, string BodyTemplate);
-public record TemplateResponse(Guid Id, string Name, string SubjectTemplate, string BodyTemplate, DateTime CreatedAt, DateTime UpdatedAt);
+public record CreateTemplateRequest(string Name, string SubjectTemplate, string BodyTemplate, List<Guid>? AttachmentFileIds = null);
+public record UpdateTemplateRequest(string Name, string SubjectTemplate, string BodyTemplate, List<Guid>? AttachmentFileIds = null);
+public record TemplateResponse(Guid Id, string Name, string SubjectTemplate, string BodyTemplate, DateTime CreatedAt, DateTime UpdatedAt, List<Guid>? AttachmentFileIds = null);
+
+// ===== User Files =====
+public record UserFileResponse(
+    Guid Id,
+    string OriginalName,
+    string MimeType,
+    long Size,
+    DateTime CreatedAt,
+    int UsageCount = 0,
+    List<string>? TemplateNames = null);
 
 // ===== Message Templates (WhatsApp) =====
 public record CreateMessageTemplateRequest(string Name, string BodyTemplate);
@@ -32,8 +42,8 @@ public record QueueItemResponse(Guid Id, string Recipient, string? PhoneNumber, 
 public record QueueStatsResponse(int Total, int Pending, int Sent, int Failed, int Sending);
 
 // ===== Audiences =====
-public record CreateAudienceRequest(string Name);
-public record AudienceResponse(Guid Id, string Name, int ContactCount, DateTime CreatedAt);
+public record CreateAudienceRequest(string Name, string Type = "email");
+public record AudienceResponse(Guid Id, string Name, int ContactCount, DateTime CreatedAt, string Type = "email", int BroadcastCount = 0);
 public record ContactResponse(Guid Id, string? Email, string? PhoneNumber, string? Name, DateTime CreatedAt);
 public record AddContactRequest(string? Email, string? PhoneNumber, string? Name);
 

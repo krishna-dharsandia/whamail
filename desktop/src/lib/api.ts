@@ -66,9 +66,9 @@ export const credentialApi = {
 export const templateApi = {
   getAll: async () => (await getApi()).get("/templates"),
   getById: async (id: string) => (await getApi()).get(`/templates/${id}`),
-  create: async (data: { name: string; subjectTemplate: string; bodyTemplate: string }) =>
+  create: async (data: { name: string; subjectTemplate: string; bodyTemplate: string; attachmentFileIds?: string[] }) =>
     (await getApi()).post("/templates", data),
-  update: async (id: string, data: { name: string; subjectTemplate: string; bodyTemplate: string }) =>
+  update: async (id: string, data: { name: string; subjectTemplate: string; bodyTemplate: string; attachmentFileIds?: string[] }) =>
     (await getApi()).put(`/templates/${id}`, data),
   delete: async (id: string) => (await getApi()).delete(`/templates/${id}`),
 };
@@ -77,7 +77,7 @@ export const templateApi = {
 export const audienceApi = {
   getAll: async () => (await getApi()).get("/audiences"),
   getById: async (id: string) => (await getApi()).get(`/audiences/${id}`),
-  create: async (name: string) => (await getApi()).post("/audiences", { name }),
+  create: async (name: string, type: string = "email") => (await getApi()).post("/audiences", { name, type }),
   delete: async (id: string) => (await getApi()).delete(`/audiences/${id}`),
   getContacts: async (id: string) => (await getApi()).get(`/audiences/${id}/contacts`),
   addContact: async (id: string, data: { email?: string; phoneNumber?: string; name?: string }) =>
@@ -129,6 +129,23 @@ export const queueApi = {
     }>
   ) => (await getApi()).post("/queue/batch", { emails }),
   cancel: async (id: string) => (await getApi()).delete(`/queue/${id}`),
+};
+
+// ===== Files =====
+export const fileApi = {
+  getAll: async () => (await getApi()).get("/files"),
+  upload: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return (await getApi()).post("/files/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+  delete: async (id: string) => (await getApi()).delete(`/files/${id}`),
+  downloadUrl: async (id: string) => {
+    const baseURL = await getBaseUrl();
+    return `${baseURL}/files/${id}/download`;
+  },
 };
 
 // ===== Metrics =====

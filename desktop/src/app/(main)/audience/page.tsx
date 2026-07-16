@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback, DragEvent } from "react";
 import { toast } from "sonner";
-import { Info, Loader2, Plus, Trash2, Upload, Users, X, ChevronRight, ChevronLeft } from "lucide-react";
+import { Info, Loader2, Mail, MessageCircle, Plus, Trash2, Upload, Users, X, ChevronRight, ChevronLeft } from "lucide-react";
 
 import { audienceApi } from "@/lib/api";
+import { PageActions, BreadcrumbLabel, useGlobalRefresh } from "../layout";
+import { useTableHeight } from "@/hooks/use-table-height";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -30,6 +32,8 @@ interface Audience {
   name: string;
   contactCount: number;
   createdAt: string;
+  type: string;
+  broadcastCount: number;
 }
 
 interface Contact {
@@ -196,11 +200,13 @@ function buildInitialMappings(headers: string[], firstRow: CsvDataRow | undefine
 /** Rebuild CSV file from mapped data rows, skipping "skip" columns */
 function buildCsvFile(rows: CsvDataRow[], mappings: ColumnMapping[]): File {
   const emailCol = mappings.find((m) => m.role === "email");
+  const phoneCol = mappings.find((m) => m.role === "phone");
   const nameCol = mappings.find((m) => m.role === "name");
   const customCols = mappings.filter((m) => m.role === "custom");
 
   const outputCols: Array<{ header: string; outName: string }> = [];
   if (emailCol) outputCols.push({ header: emailCol.header, outName: "email" });
+  if (phoneCol) outputCols.push({ header: phoneCol.header, outName: "phone" });
   if (nameCol) outputCols.push({ header: nameCol.header, outName: "name" });
   customCols.forEach((m) => outputCols.push({ header: m.header, outName: m.variableName }));
 
@@ -226,6 +232,7 @@ function saveMergeTagsForAudience(audienceId: string, mappings: ColumnMapping[])
     const tags: MergeTag[] = [];
 
     const emailMap = mappings.find((m) => m.role === "email");
+    const phoneMap = mappings.find((m) => m.role === "phone");
     const nameMap = mappings.find((m) => m.role === "name");
 
     tags.push({
@@ -233,6 +240,13 @@ function saveMergeTagsForAudience(audienceId: string, mappings: ColumnMapping[])
       value: "{{email}}",
       sample: emailMap?.sample || "user@example.com",
     });
+    if (phoneMap) {
+      tags.push({
+        name: "Phone",
+        value: "{{phone}}",
+        sample: phoneMap.sample || "+919876543210",
+      });
+    }
     if (nameMap) {
       tags.push({
         name: "Name",
@@ -265,14 +279,16 @@ function saveMergeTagsForAudience(audienceId: string, mappings: ColumnMapping[])
 // ─────────────────────────────────────────────
 
 interface ColumnMappingStepProps {
+  audienceType: "email" | "whatsapp";
   mappings: ColumnMapping[];
   onChange: (mappings: ColumnMapping[]) => void;
   onNext: () => void;
   onCancel: () => void;
 }
 
-function ColumnMappingStep({ mappings, onChange, onNext, onCancel }: ColumnMappingStepProps) {
-  const hasEmail = mappings.some((m) => m.role === "email");
+function ColumnMappingStep({ audienceType, mappings, onChange, onNext, onCancel }: ColumnMappingStepProps) {
+  const requiredRole = audienceType === "whatsapp" ? "phone" : "email";
+  const hasRequiredField = mappings.some((m) => m.role === requiredRole);
 
   function updateRole(idx: number, role: ColumnRole) {
     const next = mappings.map((m, i) => {
@@ -406,10 +422,14 @@ function ColumnMappingStep({ mappings, onChange, onNext, onCancel }: ColumnMappi
         </table>
       </div>
 
-      {!hasEmail && (
+      {!hasRequiredField && (
         <p className="text-xs text-destructive flex items-center gap-1.5">
           <Info className="h-3.5 w-3.5 shrink-0" />
-          You must map at least one column to <strong>Email</strong> or <strong>Phone Number</strong>.
+          {audienceType === "whatsapp" ? (
+            <>You must map at least one column to <strong>Phone Number</strong>.</>
+          ) : (
+            <>You must map at least one column to <strong>Email</strong>.</>
+          )}
         </p>
       )}
 
@@ -417,7 +437,7 @@ function ColumnMappingStep({ mappings, onChange, onNext, onCancel }: ColumnMappi
         <Button type="button" variant="outline" size="sm" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="button" size="sm" disabled={!hasEmail} onClick={onNext}>
+        <Button type="button" size="sm" disabled={!hasRequiredField} onClick={onNext}>
           Next
           <ChevronRight className="h-4 w-4 ml-1" />
         </Button>
@@ -431,6 +451,7 @@ function ColumnMappingStep({ mappings, onChange, onNext, onCancel }: ColumnMappi
 // ─────────────────────────────────────────────
 
 interface SpreadsheetEditorProps {
+  audienceType: "email" | "whatsapp";
   rows: CsvDataRow[];
   mappings: ColumnMapping[];
   onChange: (rows: CsvDataRow[]) => void;
@@ -440,6 +461,7 @@ interface SpreadsheetEditorProps {
 }
 
 function SpreadsheetEditor({
+  audienceType,
   rows,
   mappings,
   onChange,
@@ -448,11 +470,14 @@ function SpreadsheetEditor({
   importing,
 }: SpreadsheetEditorProps) {
   const visibleMappings = mappings.filter((m) => m.role !== "skip");
-  const emailMapping = mappings.find((m) => m.role === "email");
+  const requiredRole = audienceType === "whatsapp" ? "phone" : "email";
+  const requiredMapping = mappings.find((m) => m.role === requiredRole);
+  const validateRequiredValue = (value: string) =>
+    audienceType === "whatsapp" ? isValidPhone(value) : isValidEmail(value);
 
   const validCount = rows.filter((row) => {
-    const email = emailMapping ? (row[emailMapping.header] ?? "") : "";
-    return isValidEmail(email);
+    const requiredValue = requiredMapping ? (row[requiredMapping.header] ?? "") : "";
+    return validateRequiredValue(requiredValue);
   }).length;
   const invalidCount = rows.length - validCount;
 
@@ -488,7 +513,7 @@ function SpreadsheetEditor({
               <span className="text-destructive font-medium">
                 {invalidCount} row{invalidCount !== 1 ? "s" : ""} highlighted in red
               </span>{" "}
-              have invalid emails and will be skipped — fix them to include those contacts.
+              have invalid {audienceType === "whatsapp" ? "phone numbers" : "emails"} and will be skipped — fix them to include those contacts.
             </>
           )}
         </span>
@@ -537,8 +562,8 @@ function SpreadsheetEditor({
           </thead>
           <tbody>
             {rows.map((row, rowIdx) => {
-              const emailVal = emailMapping ? (row[emailMapping.header] ?? "") : "";
-              const isInvalid = !isValidEmail(emailVal);
+              const requiredValue = requiredMapping ? (row[requiredMapping.header] ?? "") : "";
+              const isInvalid = !validateRequiredValue(requiredValue);
               return (
                 <tr
                   key={rowIdx}
@@ -621,12 +646,15 @@ function SpreadsheetEditor({
 // ─────────────────────────────────────────────
 
 export default function AudiencePage() {
+  const { containerRef: tableContainerRef, pageSize } = useTableHeight();
   const [audiences, setAudiences] = useState<Audience[]>([]);
+  const [audPage, setAudPage] = useState(0);
   const [loading, setLoading] = useState(true);
 
   // Audience create dialog
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newType, setNewType] = useState<"email" | "whatsapp">("email");
   const [creating, setCreating] = useState(false);
 
   // Delete audience dialog
@@ -658,11 +686,7 @@ export default function AudiencePage() {
   const dragCounter = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    loadAudiences();
-  }, []);
-
-  async function loadAudiences() {
+  const loadAudiences = useCallback(async () => {
     try {
       const res = await audienceApi.getAll();
       setAudiences(res.data);
@@ -671,7 +695,10 @@ export default function AudiencePage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => { loadAudiences(); }, [loadAudiences]);
+  useGlobalRefresh(loadAudiences);
 
   async function openAudience(audience: Audience) {
     setActiveAudience(audience);
@@ -691,11 +718,12 @@ export default function AudiencePage() {
     if (!newName.trim()) return;
     setCreating(true);
     try {
-      const res = await audienceApi.create(newName.trim());
+      const res = await audienceApi.create(newName.trim(), newType);
       setAudiences((prev) => [res.data, ...prev]);
       toast.success("Audience created.");
       setCreateOpen(false);
       setNewName("");
+      setNewType("email");
     } catch {
       toast.error("Failed to create audience.");
     } finally {
@@ -725,8 +753,14 @@ export default function AudiencePage() {
     if (!activeAudience) return;
     const email = contactForm.email.trim();
     const phone = contactForm.phoneNumber.trim();
-    if (!email && !phone) {
-      toast.error("Please enter either an email or phone number.");
+    const requiresPhone = activeAudience.type === "whatsapp";
+
+    if (requiresPhone && !phone) {
+      toast.error("Please enter a WhatsApp phone number.");
+      return;
+    }
+    if (!requiresPhone && !email) {
+      toast.error("Please enter an email address.");
       return;
     }
     if (email && !isValidEmail(email)) {
@@ -860,15 +894,27 @@ export default function AudiencePage() {
   async function handleImport() {
     if (!activeAudience) return;
 
-    const emailMapping = columnMappings.find((m) => m.role === "email");
-    if (!emailMapping) {
-      toast.error("No email column mapped.");
+    const requiredRole = activeAudience.type === "whatsapp" ? "phone" : "email";
+    const requiredMapping = columnMappings.find((m) => m.role === requiredRole);
+    if (!requiredMapping) {
+      toast.error(
+        activeAudience.type === "whatsapp"
+          ? "No phone number column mapped."
+          : "No email column mapped."
+      );
       return;
     }
 
-    const validRows = csvRows.filter((row) => isValidEmail(row[emailMapping.header] ?? ""));
+    const validRows = csvRows.filter((row) => {
+      const value = row[requiredMapping.header] ?? "";
+      return activeAudience.type === "whatsapp" ? isValidPhone(value) : isValidEmail(value);
+    });
     if (validRows.length === 0) {
-      toast.error("No valid email addresses found.");
+      toast.error(
+        activeAudience.type === "whatsapp"
+          ? "No valid phone numbers found."
+          : "No valid email addresses found."
+      );
       return;
     }
 
@@ -921,6 +967,10 @@ export default function AudiencePage() {
   // ─────────────────────────────────────────────
 
   if (activeAudience) {
+    const requiresPhone = activeAudience.type === "whatsapp";
+    const readyContacts = contacts.filter((c) => requiresPhone ? !!c.phoneNumber : !!c.email);
+    const missingPrimaryContacts = contacts.filter((c) => requiresPhone ? !c.phoneNumber : !c.email);
+
     return (
       <div
         className="relative flex flex-col gap-4"
@@ -940,33 +990,28 @@ export default function AudiencePage() {
           </div>
         )}
 
-        {/* Header */}
-        <div className="flex items-center gap-3">
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-semibold truncate">{activeAudience.name}</h1>
-            <p className="text-sm text-muted-foreground">
-              {activeAudience.contactCount} contact
-              {activeAudience.contactCount !== 1 ? "s" : ""}
-            </p>
-          </div>
-          <div className="flex gap-2 shrink-0">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv"
-              className="hidden"
-              onChange={handleFileInput}
-            />
-            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
-              <Upload className="h-4 w-4 mr-2" />
-              Import CSV
-            </Button>
-            <Button size="sm" onClick={() => setAddContactOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Contact
-            </Button>
-          </div>
-        </div>
+        <BreadcrumbLabel>{activeAudience.name}</BreadcrumbLabel>
+        <PageActions>
+          <Button variant="outline" size="sm" onClick={() => setActiveAudience(null)}>
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Back
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={handleFileInput}
+          />
+          <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+            <Upload className="h-4 w-4 mr-1" />
+            Import CSV
+          </Button>
+          <Button size="sm" onClick={() => setAddContactOpen(true)}>
+            <Plus className="h-4 w-4 mr-1" />
+            Contact
+          </Button>
+        </PageActions>
 
         {/* Drag hint */}
         <div className="flex items-center gap-2 rounded-md border border-dashed border-muted-foreground/30 bg-muted/20 px-3 py-2 text-xs text-muted-foreground select-none">
@@ -979,7 +1024,7 @@ export default function AudiencePage() {
           <div className="flex items-center justify-center h-40">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
-        ) : contacts.length === 0 ? (
+        ) : readyContacts.length === 0 && missingPrimaryContacts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-center">
             <Users className="h-10 w-10 text-muted-foreground mb-3" />
             <p className="font-medium">No contacts yet</p>
@@ -988,42 +1033,93 @@ export default function AudiencePage() {
             </p>
           </div>
         ) : (
-          <div className="rounded-md border overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Added</TableHead>
-                  <TableHead className="w-10" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {contacts.map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell className="font-medium">
-                      {c.email && <div>{c.email}</div>}
-                      {c.phoneNumber && <div className="text-muted-foreground text-xs">{c.phoneNumber}</div>}
-                      {!c.email && !c.phoneNumber && "—"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{c.name ?? "—"}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {new Date(c.createdAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                        onClick={() => setDeleteContactId(c.id)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="space-y-4">
+            {readyContacts.length > 0 && (
+              <div className="rounded-md border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{requiresPhone ? "WhatsApp Number" : "Email"}</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead>{requiresPhone ? "Email" : "Phone"}</TableHead>
+                      <TableHead>Added</TableHead>
+                      <TableHead className="w-10" />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {readyContacts.map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell className="font-medium">
+                          {requiresPhone ? c.phoneNumber : c.email}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{c.name ?? "—"}</TableCell>
+                        <TableCell className="text-muted-foreground text-xs">
+                          {requiresPhone ? (c.email ?? "—") : (c.phoneNumber ?? "—")}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {new Date(c.createdAt).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => setDeleteContactId(c.id)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {missingPrimaryContacts.length > 0 && (
+              <Card className="border-dashed border-amber-300 dark:border-amber-700">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm text-amber-700 dark:text-amber-300">
+                    {requiresPhone ? "Without WhatsApp Number" : "Without Email"} ({missingPrimaryContacts.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>{requiresPhone ? "Email" : "Phone"}</TableHead>
+                        <TableHead>Added</TableHead>
+                        <TableHead className="w-10" />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {missingPrimaryContacts.map((c) => (
+                        <TableRow key={c.id}>
+                          <TableCell className="font-medium">{c.name ?? "—"}</TableCell>
+                          <TableCell className="text-muted-foreground text-xs">
+                            {requiresPhone ? (c.email ?? "—") : (c.phoneNumber ?? "—")}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {new Date(c.createdAt).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => setDeleteContactId(c.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
@@ -1039,7 +1135,10 @@ export default function AudiencePage() {
             <form onSubmit={handleAddContact}>
               <div className="space-y-4 py-2">
                 <div className="space-y-2">
-                  <Label>Email</Label>
+                  <Label>
+                    Email
+                    {activeAudience.type === "email" && <span className="text-destructive"> *</span>}
+                  </Label>
                   <Input
                     type="email"
                     placeholder="contact@example.com"
@@ -1048,14 +1147,17 @@ export default function AudiencePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Phone Number</Label>
+                  <Label>
+                    Phone Number
+                    {activeAudience.type === "whatsapp" && <span className="text-destructive"> *</span>}
+                  </Label>
                   <Input
                     placeholder="+919876543210"
                     value={contactForm.phoneNumber}
                     onChange={(e) => setContactForm((f) => ({ ...f, phoneNumber: e.target.value }))}
                   />
-                  <p className="text-xs text-muted-foreground">International format with country code</p>
-                </div>
+                <p className="text-xs text-muted-foreground">International format with country code</p>
+              </div>
                 <div className="space-y-2">
                   <Label>Name</Label>
                   <Input
@@ -1165,6 +1267,7 @@ export default function AudiencePage() {
 
             {csvDialogState === "mapping" && (
               <ColumnMappingStep
+                audienceType={activeAudience.type as "email" | "whatsapp"}
                 mappings={columnMappings}
                 onChange={setColumnMappings}
                 onNext={() => setCsvDialogState("editing")}
@@ -1174,6 +1277,7 @@ export default function AudiencePage() {
 
             {csvDialogState === "editing" && (
               <SpreadsheetEditor
+                audienceType={activeAudience.type as "email" | "whatsapp"}
                 rows={csvRows}
                 mappings={columnMappings}
                 onChange={setCsvRows}
@@ -1192,22 +1296,20 @@ export default function AudiencePage() {
   // Audience list view
   // ─────────────────────────────────────────────
 
+  const audTotalPages = Math.max(1, Math.ceil(audiences.length / pageSize));
+  const audSafePage = Math.min(audPage, audTotalPages - 1);
+  const pagedAudiences = audiences.slice(audSafePage * pageSize, (audSafePage + 1) * pageSize);
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold">Audiences</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Manage your contact lists and import contacts via CSV.
-          </p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" /> New Audience
+    <div ref={tableContainerRef} className="flex flex-col flex-1 min-h-0">
+      <PageActions>
+        <Button onClick={() => setCreateOpen(true)} size="sm">
+          <Plus className="h-4 w-4 mr-1" /> Audience
         </Button>
-      </div>
+      </PageActions>
 
       {audiences.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-64 text-center">
+        <div className="flex flex-col items-center justify-center flex-1 text-center">
           <Users className="h-10 w-10 text-muted-foreground mb-3" />
           <p className="font-medium">No audiences yet</p>
           <p className="text-sm text-muted-foreground mt-1">
@@ -1218,41 +1320,72 @@ export default function AudiencePage() {
           </Button>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {audiences.map((a) => (
-            <Card
-              key={a.id}
-              className="flex flex-col cursor-pointer hover:shadow-md transition-shadow"
-              onClick={() => openAudience(a)}
-            >
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between gap-2">
-                  <CardTitle className="text-base font-medium leading-snug">{a.name}</CardTitle>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeleteAudienceId(a.id);
-                    }}
+        <>
+          <div className="flex-1 min-h-0 overflow-auto border rounded-lg">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Contacts</TableHead>
+                  <TableHead className="text-right">Broadcasts</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="w-12" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pagedAudiences.map((a) => (
+                  <TableRow
+                    key={a.id}
+                    className="cursor-pointer"
+                    onClick={() => openAudience(a)}
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                  <Users className="h-4 w-4" />
-                  {a.contactCount} contact{a.contactCount !== 1 ? "s" : ""}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1.5">
-                  Created {new Date(a.createdAt).toLocaleDateString()}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                    <TableCell className="font-medium">{a.name}</TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                        a.type === "whatsapp"
+                          ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                          : "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                      }`}>
+                        {a.type === "whatsapp" ? <MessageCircle className="h-3 w-3" /> : <Mail className="h-3 w-3" />}
+                        {a.type === "whatsapp" ? "WA" : "Email"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">{a.contactCount}</TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">{a.broadcastCount}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {new Date(a.createdAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => setDeleteAudienceId(a.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Pagination */}
+          <div className="flex items-center justify-between pt-3 shrink-0">
+            <p className="text-xs text-muted-foreground">{audiences.length} audience{audiences.length !== 1 ? "s" : ""}</p>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="icon" className="h-7 w-7" disabled={audSafePage === 0} onClick={() => setAudPage((p) => p - 1)}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-xs text-muted-foreground px-2">{audSafePage + 1} / {audTotalPages}</span>
+              <Button variant="outline" size="icon" className="h-7 w-7" disabled={audSafePage >= audTotalPages - 1} onClick={() => setAudPage((p) => p + 1)}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </>
       )}
 
       {/* Create Audience Dialog */}
@@ -1263,14 +1396,41 @@ export default function AudiencePage() {
             <DialogDescription>Give your audience a name to get started.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreateAudience}>
-            <div className="space-y-2 py-2">
-              <Label>Audience Name</Label>
-              <Input
-                placeholder="e.g. Newsletter Subscribers"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                autoFocus
-              />
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewType("email")}
+                    className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-colors ${
+                      newType === "email" ? "border-primary bg-primary/5" : "border-muted hover:border-muted-foreground/30"
+                    }`}
+                  >
+                    <Mail className="h-5 w-5" />
+                    <span className="text-sm font-medium">Email</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewType("whatsapp")}
+                    className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-colors ${
+                      newType === "whatsapp" ? "border-primary bg-primary/5" : "border-muted hover:border-muted-foreground/30"
+                    }`}
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                    <span className="text-sm font-medium">WhatsApp</span>
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Audience Name</Label>
+                <Input
+                  placeholder="e.g. Newsletter Subscribers"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  autoFocus
+                />
+              </div>
             </div>
             <DialogFooter className="mt-4">
               <Button

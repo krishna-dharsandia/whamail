@@ -1,12 +1,12 @@
-using MailBridge.API.Data;
-using MailBridge.API.DTOs;
-using MailBridge.API.Models;
+using Whamail.API.Data;
+using Whamail.API.DTOs;
+using Whamail.API.Models;
 using MailKit.Net.Smtp;
 using MailKit.Security;
 using Microsoft.EntityFrameworkCore;
 using MimeKit;
 
-namespace MailBridge.API.Services;
+namespace Whamail.API.Services;
 
 public interface ICredentialService
 {

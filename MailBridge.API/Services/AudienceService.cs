@@ -1,10 +1,10 @@
-using MailBridge.API.Data;
-using MailBridge.API.DTOs;
-using MailBridge.API.Models;
+using Whamail.API.Data;
+using Whamail.API.DTOs;
+using Whamail.API.Models;
 using Microsoft.EntityFrameworkCore;
 using System.Text.RegularExpressions;
 
-namespace MailBridge.API.Services;
+namespace Whamail.API.Services;
 
 public interface IAudienceService
 {
@@ -32,7 +32,9 @@ public class AudienceService : IAudienceService
             .Select(a => new AudienceResponse(
                 a.Id, a.Name,
                 a.Contacts.Count,
-                a.CreatedAt))
+                a.CreatedAt,
+                a.Type,
+                a.Broadcasts.Count))
             .ToListAsync();
     }
 
@@ -43,23 +45,28 @@ public class AudienceService : IAudienceService
             .FirstOrDefaultAsync(x => x.Id == audienceId && x.UserId == userId)
             ?? throw new InvalidOperationException("Audience not found.");
 
-        return new AudienceResponse(a.Id, a.Name, a.Contacts.Count, a.CreatedAt);
+        var broadcastCount = await _db.Broadcasts.CountAsync(b => b.AudienceId == audienceId);
+        return new AudienceResponse(a.Id, a.Name, a.Contacts.Count, a.CreatedAt, a.Type, broadcastCount);
     }
 
     public async Task<AudienceResponse> CreateAsync(Guid userId, CreateAudienceRequest request)
     {
+        var validTypes = new[] { "email", "whatsapp" };
+        var type = validTypes.Contains(request.Type?.ToLower()) ? request.Type.ToLower() : "email";
+
         var audience = new Audience
         {
             Id = Guid.NewGuid(),
             UserId = userId,
             Name = request.Name.Trim(),
+            Type = type,
             CreatedAt = DateTime.UtcNow,
         };
 
         _db.Audiences.Add(audience);
         await _db.SaveChangesAsync();
 
-        return new AudienceResponse(audience.Id, audience.Name, 0, audience.CreatedAt);
+        return new AudienceResponse(audience.Id, audience.Name, 0, audience.CreatedAt, audience.Type, 0);
     }
 
     public async Task DeleteAsync(Guid userId, Guid audienceId)
@@ -92,8 +99,16 @@ public class AudienceService : IAudienceService
         var email = request.Email?.Trim().ToLower();
         var phone = request.PhoneNumber?.Trim();
 
-        if (string.IsNullOrEmpty(email) && string.IsNullOrEmpty(phone))
-            throw new InvalidOperationException("Either email or phone number is required.");
+        if (audience.Type == "whatsapp")
+        {
+            if (string.IsNullOrEmpty(phone))
+                throw new InvalidOperationException("WhatsApp audiences require a phone number.");
+        }
+        else
+        {
+            if (string.IsNullOrEmpty(email))
+                throw new InvalidOperationException("Email audiences require an email address.");
+        }
 
         if (!string.IsNullOrEmpty(email) && !IsValidEmail(email))
             throw new InvalidOperationException("Invalid email address.");
@@ -175,6 +190,8 @@ public class AudienceService : IAudienceService
         int added = 0, skipped = 0;
         var newContacts = new List<Contact>();
 
+        var headerMap = ParseHeaders(lines[0]);
+
         foreach (var line in lines.Skip(startIndex))
         {
             var parts = line.Split(',');
@@ -186,8 +203,13 @@ public class AudienceService : IAudienceService
             string? phone = null;
             string? name = null;
 
-            // Detect if first column is email or phone
-            if (IsValidEmail(firstCol))
+            if (headerMap.Count > 0)
+            {
+                email = GetPart(parts, headerMap, "email")?.ToLower();
+                phone = GetPart(parts, headerMap, "phone");
+                name = GetPart(parts, headerMap, "name");
+            }
+            else if (IsValidEmail(firstCol))
             {
                 email = firstCol.ToLower();
                 name = secondCol;
@@ -211,7 +233,13 @@ public class AudienceService : IAudienceService
                     phone = thirdCol;
             }
 
-            if (string.IsNullOrEmpty(email) && string.IsNullOrEmpty(phone))
+            if (audience.Type == "whatsapp" && string.IsNullOrEmpty(phone))
+            {
+                skipped++;
+                continue;
+            }
+
+            if (audience.Type != "whatsapp" && string.IsNullOrEmpty(email))
             {
                 skipped++;
                 continue;
@@ -261,5 +289,35 @@ public class AudienceService : IAudienceService
     private static bool IsValidPhone(string phone)
     {
         return Regex.IsMatch(phone, @"^\+[1-9]\d{6,14}$");
+    }
+
+    private static Dictionary<string, int> ParseHeaders(string headerLine)
+    {
+        var parts = headerLine.Split(',');
+        var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        for (var i = 0; i < parts.Length; i++)
+        {
+            var normalized = parts[i].Trim().Trim('"').ToLowerInvariant();
+            if (normalized == "email")
+                map["email"] = i;
+            else if (normalized == "phone")
+                map["phone"] = i;
+            else if (normalized == "name")
+                map["name"] = i;
+        }
+
+        return map;
+    }
+
+    private static string? GetPart(string[] parts, Dictionary<string, int> headerMap, string key)
+    {
+        if (!headerMap.TryGetValue(key, out var index) || index >= parts.Length)
+        {
+            return null;
+        }
+
+        var value = parts[index].Trim().Trim('"');
+        return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 }
