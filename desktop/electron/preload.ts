@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
       ipcRenderer.invoke("whatsapp:check-number", phone),
     getInfo: () => ipcRenderer.invoke("whatsapp:get-info"),
     getContacts: () => ipcRenderer.invoke("whatsapp:get-contacts"),
+    getContactAvatar: (waId: string) => ipcRenderer.invoke("whatsapp:get-contact-avatar", waId),
 
     // Paced queue sending
     getRunState: () => ipcRenderer.invoke("whatsapp:run-get-state"),

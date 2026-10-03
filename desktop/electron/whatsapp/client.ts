@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Client as ClientType } from "whatsapp-web.js";
 import { findChromeExecutable } from "./chrome.js";
@@ -10,6 +10,63 @@ export interface ConnectionOptions {
   /** Writable directory for the cached WhatsApp Web build. */
   cacheDir: string;
   onStatus?: (status: ConnectionStatus) => void;
+}
+
+/**
+ * Chrome refuses to start a second time against a profile dir that still has
+ * `SingletonLock`/`SingletonCookie`/`SingletonSocket` in it. Normally that is
+ * fine — it means a previous browser is genuinely still running. But if the
+ * Electron process that launched it was killed (crash, force-kill, OOM)
+ * without a chance to clean up, the headless Chrome child survives as an
+ * orphan nobody will ever close, and every future connect attempt dead-ends
+ * on "a previous browser is still using this session" with no way out short
+ * of hunting down the process by hand.
+ *
+ * `SingletonLock` is a symlink shaped `<hostname>-<pid>`. Resolve it and
+ * check whether that pid is still alive:
+ *  - dead (or lock missing): just clean up the leftover files, safe no-op.
+ *  - alive: it is this exact kind of orphan — Whamail has already lost track
+ *    of it and nothing else holds a reference, so reap it before clearing
+ *    the lock. Never do this if the lock resolves to our own pid.
+ * LocalAuth puts the Chrome profile at `<sessionDir>/session`.
+ */
+async function clearStaleChromeLock(sessionDir: string): Promise<void> {
+  const profileDir = join(sessionDir, "session");
+  const lockPath = join(profileDir, "SingletonLock");
+
+  try {
+    const target = readlinkSync(lockPath);
+    const pid = Number(target.slice(target.lastIndexOf("-") + 1));
+    if (Number.isInteger(pid) && pid > 0 && pid !== process.pid && isProcessAlive(pid)) {
+      console.warn(`[WhatsApp] Reaping orphaned Chrome (pid ${pid}) left over from an earlier session.`);
+      try {
+        process.kill(pid, "SIGTERM");
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        if (isProcessAlive(pid)) process.kill(pid, "SIGKILL");
+      } catch {
+        // Already gone between the check and the kill — fine.
+      }
+    }
+  } catch {
+    // No lock file, not a symlink, or unreadable — nothing to reap.
+  }
+
+  for (const name of ["SingletonLock", "SingletonCookie", "SingletonSocket"]) {
+    try {
+      rmSync(join(profileDir, name), { force: true });
+    } catch {
+      // Best-effort cleanup — a launch failure downstream still surfaces clearly.
+    }
+  }
+}
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -133,6 +190,7 @@ export class WhatsAppConnection {
 
     mkdirSync(this.options.sessionDir, { recursive: true });
     mkdirSync(this.options.cacheDir, { recursive: true });
+    await clearStaleChromeLock(this.options.sessionDir);
 
     const nextClient: ClientType = new Client({
       authStrategy: new LocalAuth({ dataPath: this.options.sessionDir }),

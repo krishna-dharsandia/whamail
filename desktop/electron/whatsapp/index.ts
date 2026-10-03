@@ -131,17 +131,29 @@ export function initWhatsApp(options: WhatsAppInitOptions): void {
     try {
       const waContacts = await conn.getClient().getContacts();
       const seen = new Set<string>();
-      const contacts: { name: string; phoneNumber: string }[] = [];
+      const contacts: { name: string; phoneNumber: string; waId: string }[] = [];
       for (const c of waContacts) {
         if (c.isGroup || !c.isWAContact || !c.number) continue;
         const { phone } = normalizePhone(c.number, settings.get().defaultCountryCode);
         if (!phone || seen.has(phone)) continue;
         seen.add(phone);
-        contacts.push({ name: c.name || c.pushname || phone, phoneNumber: phone });
+        contacts.push({ name: c.name || c.pushname || phone, phoneNumber: phone, waId: c.id._serialized });
       }
       return { success: true, contacts };
     } catch (error) {
       return { success: false, error: readableSendError(error), contacts: [] };
+    }
+  });
+
+  // Fetched lazily per-row in the UI — doing this for every contact up front
+  // is too slow for large address books and most contacts don't need it shown.
+  ipcMain.handle("whatsapp:get-contact-avatar", async (_event, waId: string) => {
+    if (!conn.isReady()) return { url: null };
+    try {
+      const url = await conn.getClient().getProfilePicUrl(String(waId ?? ""));
+      return { url: url ?? null };
+    } catch {
+      return { url: null };
     }
   });
 

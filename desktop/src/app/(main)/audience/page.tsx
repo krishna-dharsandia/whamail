@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, DragEvent } from "react";
 import { toast } from "sonner";
-import { Info, Loader2, Mail, MessageCircle, Plus, RefreshCw, Trash2, Upload, Users, X, ChevronRight, ChevronLeft } from "lucide-react";
+import { Info, Loader2, Mail, MessageCircle, Plus, RefreshCw, Search, Trash2, Upload, Users, X, ChevronRight, ChevronLeft } from "lucide-react";
 
 import { audienceApi } from "@/lib/api";
 import { getWhatsAppBridge } from "@/hooks/use-whatsapp";
@@ -20,6 +20,9 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -643,6 +646,33 @@ function SpreadsheetEditor({
 }
 
 // ─────────────────────────────────────────────
+// WhatsApp contact avatar — fetched lazily per row, never blocks the list
+// ─────────────────────────────────────────────
+
+function WhatsAppContactAvatar({ waId, name }: { waId: string; name: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const wa = getWhatsAppBridge();
+    if (!wa) return;
+    wa.getContactAvatar(waId).then((res) => {
+      if (!cancelled && res.url) setUrl(res.url);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [waId]);
+
+  const initial = name.trim().charAt(0).toUpperCase() || "#";
+
+  return (
+    <Avatar size="sm">
+      {url && <AvatarImage src={url} alt={name} />}
+      <AvatarFallback className="text-xs">{initial}</AvatarFallback>
+    </Avatar>
+  );
+}
+
+// ─────────────────────────────────────────────
 // Main Page Component
 // ─────────────────────────────────────────────
 
@@ -714,35 +744,77 @@ export default function AudiencePage() {
     }
   }
 
-  const [syncingWhatsApp, setSyncingWhatsApp] = useState(false);
+  // WhatsApp contact sync: search + pick which contacts to add, nothing is
+  // imported automatically.
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncContacts, setSyncContacts] = useState<{ name: string; phoneNumber: string; waId: string }[]>([]);
+  const [syncSearch, setSyncSearch] = useState("");
+  const [selectedPhones, setSelectedPhones] = useState<Set<string>>(new Set());
+  const [importingSelected, setImportingSelected] = useState(false);
 
-  async function handleSyncWhatsApp() {
+  async function openSyncDialog() {
     if (!activeAudience) return;
     const wa = getWhatsAppBridge();
     if (!wa) {
       toast.error("Open the desktop app to sync WhatsApp contacts.");
       return;
     }
-    setSyncingWhatsApp(true);
+    setSyncDialogOpen(true);
+    setSyncSearch("");
+    setSelectedPhones(new Set());
+    setSyncLoading(true);
+    setSyncError(null);
     try {
       const result = await wa.getContacts();
       if (!result.success) {
-        toast.error(result.error ?? "Could not read WhatsApp contacts. Make sure WhatsApp is connected.");
+        setSyncError(result.error ?? "Could not read WhatsApp contacts. Make sure WhatsApp is connected.");
+        setSyncContacts([]);
         return;
       }
-      if (result.contacts.length === 0) {
-        toast.info("No WhatsApp contacts found to sync.");
-        return;
-      }
-      const res = await audienceApi.bulkImportContacts(activeAudience.id, result.contacts);
-      toast.success(res.data.message ?? `Synced ${res.data.added} contacts.`);
+      setSyncContacts(result.contacts);
+    } catch {
+      setSyncError("Could not read WhatsApp contacts.");
+      setSyncContacts([]);
+    } finally {
+      setSyncLoading(false);
+    }
+  }
+
+  const existingPhones = new Set(contacts.map((c) => c.phoneNumber).filter((p): p is string => !!p));
+  const filteredSyncContacts = syncContacts.filter((c) => {
+    const q = syncSearch.trim().toLowerCase();
+    if (!q) return true;
+    return c.name.toLowerCase().includes(q) || c.phoneNumber.includes(q);
+  });
+
+  function toggleSyncSelection(phone: string) {
+    setSelectedPhones((prev) => {
+      const next = new Set(prev);
+      if (next.has(phone)) next.delete(phone);
+      else next.add(phone);
+      return next;
+    });
+  }
+
+  async function handleImportSelected() {
+    if (!activeAudience || selectedPhones.size === 0) return;
+    setImportingSelected(true);
+    try {
+      const toImport = syncContacts
+        .filter((c) => selectedPhones.has(c.phoneNumber))
+        .map((c) => ({ phoneNumber: c.phoneNumber, name: c.name }));
+      const res = await audienceApi.bulkImportContacts(activeAudience.id, toImport);
+      toast.success(res.data.message ?? `Added ${res.data.added} contacts.`);
+      setSyncDialogOpen(false);
       await openAudience(activeAudience);
       loadAudiences();
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to sync contacts.";
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to add contacts.";
       toast.error(msg);
     } finally {
-      setSyncingWhatsApp(false);
+      setImportingSelected(false);
     }
   }
 
@@ -1041,10 +1113,8 @@ export default function AudiencePage() {
             Import CSV
           </Button>
           {activeAudience.type === "whatsapp" && (
-            <Button variant="outline" size="sm" onClick={handleSyncWhatsApp} disabled={syncingWhatsApp}>
-              {syncingWhatsApp
-                ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                : <RefreshCw className="h-4 w-4 mr-1" />}
+            <Button variant="outline" size="sm" onClick={openSyncDialog}>
+              <RefreshCw className="h-4 w-4 mr-1" />
               Sync from WhatsApp
             </Button>
           )}
@@ -1175,30 +1245,28 @@ export default function AudiencePage() {
             </DialogHeader>
             <form onSubmit={handleAddContact}>
               <div className="space-y-4 py-2">
-                <div className="space-y-2">
-                  <Label>
-                    Email
-                    {activeAudience.type === "email" && <span className="text-destructive"> *</span>}
-                  </Label>
-                  <Input
-                    type="email"
-                    placeholder="contact@example.com"
-                    value={contactForm.email}
-                    onChange={(e) => setContactForm((f) => ({ ...f, email: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>
-                    Phone Number
-                    {activeAudience.type === "whatsapp" && <span className="text-destructive"> *</span>}
-                  </Label>
-                  <Input
-                    placeholder="+919876543210"
-                    value={contactForm.phoneNumber}
-                    onChange={(e) => setContactForm((f) => ({ ...f, phoneNumber: e.target.value }))}
-                  />
-                <p className="text-xs text-muted-foreground">International format with country code</p>
-              </div>
+                {activeAudience.type === "email" && (
+                  <div className="space-y-2">
+                    <Label>Email <span className="text-destructive">*</span></Label>
+                    <Input
+                      type="email"
+                      placeholder="contact@example.com"
+                      value={contactForm.email}
+                      onChange={(e) => setContactForm((f) => ({ ...f, email: e.target.value }))}
+                    />
+                  </div>
+                )}
+                {activeAudience.type === "whatsapp" && (
+                  <div className="space-y-2">
+                    <Label>Phone Number <span className="text-destructive">*</span></Label>
+                    <Input
+                      placeholder="+919876543210"
+                      value={contactForm.phoneNumber}
+                      onChange={(e) => setContactForm((f) => ({ ...f, phoneNumber: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">International format with country code</p>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Name</Label>
                   <Input
@@ -1222,6 +1290,91 @@ export default function AudiencePage() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Sync from WhatsApp — search + pick which contacts to add */}
+        <Dialog open={syncDialogOpen} onOpenChange={setSyncDialogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Sync from WhatsApp</DialogTitle>
+              <DialogDescription>
+                Search your WhatsApp contacts and pick the ones to add to {activeAudience.name}.
+              </DialogDescription>
+            </DialogHeader>
+
+            {syncLoading ? (
+              <div className="flex items-center justify-center h-48">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : syncError ? (
+              <p className="text-sm text-destructive py-4">{syncError}</p>
+            ) : (
+              <>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by name or number"
+                    value={syncSearch}
+                    onChange={(e) => setSyncSearch(e.target.value)}
+                    className="pl-8"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-muted-foreground px-0.5">
+                  <span>{filteredSyncContacts.length} contact{filteredSyncContacts.length !== 1 ? "s" : ""}</span>
+                  <span>{selectedPhones.size} selected</span>
+                </div>
+
+                <ScrollArea className="h-72 rounded-md border">
+                  <div className="divide-y">
+                    {filteredSyncContacts.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-8">No matches.</p>
+                    ) : (
+                      filteredSyncContacts.map((c) => {
+                        const alreadyAdded = existingPhones.has(c.phoneNumber);
+                        const checked = selectedPhones.has(c.phoneNumber);
+                        return (
+                          <label
+                            key={c.waId}
+                            className={`flex items-center gap-3 px-3 py-2 ${
+                              alreadyAdded ? "opacity-50" : "cursor-pointer hover:bg-muted/50"
+                            }`}
+                          >
+                            <Checkbox
+                              checked={checked}
+                              disabled={alreadyAdded}
+                              onCheckedChange={() => toggleSyncSelection(c.phoneNumber)}
+                            />
+                            <WhatsAppContactAvatar waId={c.waId} name={c.name} />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium truncate">{c.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">{c.phoneNumber}</p>
+                            </div>
+                            {alreadyAdded && (
+                              <span className="text-xs text-muted-foreground shrink-0">Already added</span>
+                            )}
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+                </ScrollArea>
+              </>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setSyncDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleImportSelected}
+                disabled={selectedPhones.size === 0 || importingSelected}
+              >
+                {importingSelected && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Add {selectedPhones.size > 0 ? `${selectedPhones.size} ` : ""}Selected
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
