@@ -171,6 +171,14 @@ async function start() {
     initWhatsApp(mainWindow);
   }
 
+  // Handle deep link when the app is launched fresh via whamail:// (Linux/Windows cold start)
+  const initialDeepLink = process.argv.find((arg) => arg.startsWith("whamail://"));
+  if (initialDeepLink && mainWindow) {
+    mainWindow.webContents.once("did-finish-load", () => {
+      setTimeout(() => handleDeepLink(initialDeepLink), 500);
+    });
+  }
+
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();

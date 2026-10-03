@@ -82,3 +82,26 @@ dmg:
       y: 220
       type: link
       path: /Applications
+
+linux:
+  maintainer: Whamail <support@whamail.xyz>
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+  artifactName: Whamail-${version}-${arch}.${ext}
+  icon: build/icon.png
+  category: Network
+  synopsis: Open-source desktop email broadcast platform
+  description: Open-source desktop email broadcast platform built with Electron, Next.js, and .NET.
+
+deb:
+  depends:
+    - libnotify4
+    - libnss3
+    - libatk-bridge2.0-0
+    - libatk1.0-0
+    - libgtk-3-0

@@ -33,7 +33,7 @@
 - **Template Editor** — Create and reuse email templates
 - **Google OAuth** — Sign in with Google
 - **Metrics & Logs** — Track delivery and engagement
-- **Cross-Platform** — Windows (.exe) and macOS (.dmg)
+- **Cross-Platform** — Windows (.exe), macOS (.dmg), and Linux (.AppImage/.deb)
 - **System Tray** — Runs in background with tray icon
 
 ## Download
@@ -45,6 +45,8 @@ Get the latest version from the [Releases page](https://github.com/krishna-dhars
 | Windows (64-bit) | [Whamail-Setup-x64.exe](https://github.com/krishna-dharsandia/whamail/releases/latest) |
 | macOS (Apple Silicon) | [Whamail-arm64.dmg](https://github.com/krishna-dharsandia/whamail/releases/latest) |
 | macOS (Intel) | [Whamail-x64.dmg](https://github.com/krishna-dharsandia/whamail/releases/latest) |
+| Linux (64-bit, AppImage) | [Whamail-x86_64.AppImage](https://github.com/krishna-dharsandia/whamail/releases/latest) |
+| Linux (64-bit, Debian/Ubuntu) | [Whamail-amd64.deb](https://github.com/krishna-dharsandia/whamail/releases/latest) |
 
 Or visit [whamail.xyz](https://whamail.xyz) for the download page.
 
@@ -57,7 +59,7 @@ Or visit [whamail.xyz](https://whamail.xyz) for the download page.
 | UI Components | [shadcn/ui](https://ui.shadcn.com/) |
 | Backend API | [.NET 8](https://dotnet.microsoft.com/) (C#) |
 | Auth & Database | [Supabase](https://supabase.com/) |
-| Installer | [NSIS](https://nsis.sourceforge.io/) (Windows) / DMG (macOS) |
+| Installer | [NSIS](https://nsis.sourceforge.io/) (Windows) / DMG (macOS) / AppImage + deb (Linux) |
 
 ## Project Structure
 
@@ -123,6 +125,21 @@ npm run electron:build:mac-arm64
 # macOS (Intel)
 npm run electron:build:mac-x64
 # Output: dist/Whamail-1.0.0-x64.dmg
+
+# Linux
+npm run electron:build:linux
+# Output: dist/Whamail-1.0.0-x86_64.AppImage and dist/Whamail-1.0.0-amd64.deb
+```
+
+#### Linux build prerequisites
+
+Packaging `.deb` output requires `fpm`'s bundled toolchain to run, which in turn needs:
+
+```bash
+# Fedora
+sudo dnf install -y libxcrypt-compat
+
+# Debian/Ubuntu — not required, fpm's bundled Ruby works out of the box
 ```
 
 ## Release Process

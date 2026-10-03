@@ -49,7 +49,7 @@ function getApiPath(): { command: string; args: string[]; cwd: string } {
 
   // In production, use the published self-contained executable
   const resourcePath = process.resourcesPath || join(__dirname, "..");
-  const execName = process.platform === "win32" ? "MailBridge.API.exe" : "MailBridge.API";
+  const execName = process.platform === "win32" ? "Whamail.API.exe" : "Whamail.API";
   return {
     command: join(resourcePath, "api", execName),
     args: [],
