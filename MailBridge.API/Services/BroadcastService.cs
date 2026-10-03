@@ -87,6 +87,7 @@ public class BroadcastService : IBroadcastService
                 Recipient = g.Key,
                 Status = g.First().Status,
                 SentAt = g.Min(q => q.SentAt),
+                ErrorInfo = g.Max(q => q.ErrorInfo),
             })
             .ToDictionaryAsync(x => x.Recipient, x => x);
 
@@ -98,7 +99,8 @@ public class BroadcastService : IBroadcastService
                 return new BroadcastContactDto(
                     c.Email, c.PhoneNumber, c.Name,
                     q?.Status,
-                    q?.SentAt
+                    q?.SentAt,
+                    q?.ErrorInfo
                 );
             })
             .ToList();
@@ -337,11 +339,14 @@ public class BroadcastService : IBroadcastService
         var failed = stats.FirstOrDefault(s => s.Status == "Failed")?.Count ?? 0;
         var pending = stats.FirstOrDefault(s => s.Status == "Pending")?.Count ?? 0;
         var sending = stats.FirstOrDefault(s => s.Status == "Sending")?.Count ?? 0;
+        // Skipped = WhatsApp contacts that can never receive the message. They
+        // are finished work, so they count toward completion but not as failures.
+        var skipped = stats.FirstOrDefault(s => s.Status == "Skipped")?.Count ?? 0;
 
         broadcast.SentCount = sent;
         broadcast.FailedCount = failed;
 
-        if (pending == 0 && sending == 0 && (sent + failed) >= broadcast.TotalRecipients)
+        if (pending == 0 && sending == 0 && (sent + failed + skipped) >= broadcast.TotalRecipients)
         {
             broadcast.Status = failed > 0 && sent == 0 ? "Failed" : "Completed";
         }

@@ -22,6 +22,7 @@
     "electron:build:next": "cross-env ELECTRON_BUILD=true next build",
     "icon-gen": "node scripts/generate-icons.mjs",
     "electron:build:main": "tsc -p electron/tsconfig.json",
+    "test:whatsapp": "npm run electron:build:main && node --test \"tests/whatsapp/*.test.mjs\"",
     "electron:build:win": "npm run api:publish:win && npm run electron:build:next && npm run electron:build:main && electron-builder --win --x64",
     "electron:build:mac-arm64": "npm run api:publish:mac-arm64 && npm run electron:build:next && npm run electron:build:main && electron-builder --mac --arm64",
     "electron:build:mac-x64": "npm run api:publish:mac-x64 && npm run electron:build:next && npm run electron:build:main && electron-builder --mac --x64"

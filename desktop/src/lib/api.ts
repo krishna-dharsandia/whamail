@@ -112,6 +112,12 @@ export const whatsappApi = {
   saveConnected: async (data: { phoneNumber?: string; pushName?: string; platform?: string }) =>
     (await getApi()).post("/whatsapp/connected", data),
   disconnect: async () => (await getApi()).post("/whatsapp/disconnect"),
+  /** Counts of queued WhatsApp messages by status, optionally for one broadcast. */
+  queueStats: async (broadcastId?: string) =>
+    (await getApi()).get("/whatsapp/queue/stats", { params: { broadcastId } }),
+  /** Put failed WhatsApp messages back in the queue. Skipped ones stay skipped. */
+  retryFailed: async (broadcastId?: string) =>
+    (await getApi()).post("/whatsapp/queue/retry-failed", null, { params: { broadcastId } }),
 };
 
 // ===== Email Queue =====
