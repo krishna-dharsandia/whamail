@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/table";
 import { PageActions, useGlobalRefresh } from "../layout";
 import { useTableHeight } from "@/hooks/use-table-height";
+import { startWhatsAppRun } from "@/hooks/use-whatsapp";
 
 interface Broadcast {
   id: string;
@@ -156,7 +157,15 @@ export default function BroadcastPage() {
     try {
       const res = await broadcastApi.send(id);
       setBroadcasts((prev) => prev.map((b) => b.id === id ? res.data : b));
-      toast.success("Sending!");
+      if (res.data.channel === "whatsapp") {
+        // The API only queues WhatsApp messages; the desktop app delivers them.
+        const outcome = await startWhatsAppRun();
+        if (outcome.started) toast.success("Sending started. Messages go out one at a time.");
+        else if (outcome.reason === "error") toast.error(outcome.message);
+        else toast.warning(outcome.message);
+      } else {
+        toast.success("Sending!");
+      }
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to send.";
       toast.error(msg);

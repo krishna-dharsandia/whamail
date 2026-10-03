@@ -8,7 +8,10 @@ public enum EmailStatus
     Pending,
     Sending,
     Sent,
-    Failed
+    Failed,
+    // WhatsApp only: the contact can never receive the message (e.g. the
+    // number is not on WhatsApp), so retrying is pointless.
+    Skipped
 }
 
 [Table("email_queue")]

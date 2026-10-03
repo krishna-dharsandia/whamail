@@ -10,13 +10,16 @@ import {
   Loader2,
   Mail,
   MailOpen,
+  RotateCcw,
   Send,
+  SkipForward,
   Trash2,
   Users,
   XCircle,
 } from "lucide-react";
 
-import { broadcastApi } from "@/lib/api";
+import { broadcastApi, whatsappApi } from "@/lib/api";
+import { isRunActive, startWhatsAppRun, useWhatsApp } from "@/hooks/use-whatsapp";
 import { PageActions, BreadcrumbLabel } from "../../layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +31,7 @@ interface BroadcastContact {
   name: string | null;
   queueStatus: string | null;
   sentAt: string | null;
+  errorInfo?: string | null;
 }
 
 interface BroadcastResponse {
@@ -97,6 +101,9 @@ function StatusBadge({ status }: { status: string }) {
   if (status === "Sent") {
     return <span className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/40 px-2 py-0.5 rounded-full"><Mail className="h-3 w-3" /> Sent</span>;
   }
+  if (status === "Skipped") {
+    return <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 rounded-full"><SkipForward className="h-3 w-3" /> Skipped</span>;
+  }
   if (status === "Pending" || status === "Sending") {
     return <span className="inline-flex items-center gap-1 text-xs font-medium text-yellow-700 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/40 px-2 py-0.5 rounded-full"><Loader2 className="h-3 w-3 animate-spin" /> {status}</span>;
   }
@@ -107,10 +114,13 @@ function ContactTable({
   contacts,
   primaryLabel,
   secondaryLabel,
+  showReason = false,
 }: {
   contacts: BroadcastContact[];
   primaryLabel: string;
   secondaryLabel?: string;
+  /** Show why each contact failed or was skipped, instead of the sent time. */
+  showReason?: boolean;
 }) {
   if (contacts.length === 0) return null;
   return (
@@ -123,7 +133,7 @@ function ContactTable({
             <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Name</th>
             {secondaryLabel && <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">{secondaryLabel}</th>}
             <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Status</th>
-            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Sent At</th>
+            <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">{showReason ? "Reason" : "Sent At"}</th>
           </tr>
         </thead>
         <tbody>
@@ -138,7 +148,9 @@ function ContactTable({
                 </td>
               )}
               <td className="px-4 py-3">{c.queueStatus ? <StatusBadge status={c.queueStatus} /> : <span className="text-xs text-muted-foreground">—</span>}</td>
-              <td className="px-4 py-3 text-muted-foreground text-xs">{c.sentAt ? new Date(c.sentAt).toLocaleString() : "—"}</td>
+              <td className="px-4 py-3 text-muted-foreground text-xs">
+                {showReason ? (c.errorInfo || "—") : c.sentAt ? new Date(c.sentAt).toLocaleString() : "—"}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -203,6 +215,10 @@ export default function BroadcastDetail() {
   const [detail, setDetail] = useState<BroadcastDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [resuming, setResuming] = useState(false);
+  const { run: waRun } = useWhatsApp();
+  const waRunActive = isRunActive(waRun);
 
   useEffect(() => {
     loadDetail();
@@ -228,13 +244,47 @@ export default function BroadcastDetail() {
   async function handleSendRemaining() {
     setSending(true);
     try {
-      await broadcastApi.sendRemaining(id);
-      toast.success("Sending to remaining contacts.");
+      const res = await broadcastApi.sendRemaining(id);
+      if (res.data?.channel === "whatsapp") await reportWhatsAppRun("Sending to remaining contacts.");
+      else toast.success("Sending to remaining contacts.");
       loadDetail();
     } catch (err: any) {
       toast.error(err?.response?.data?.error || "Failed to send.");
     } finally {
       setSending(false);
+    }
+  }
+
+  /** WhatsApp messages are only queued by the API; the desktop app delivers them. */
+  async function reportWhatsAppRun(successMessage: string) {
+    const outcome = await startWhatsAppRun();
+    if (outcome.started) toast.success(successMessage);
+    else if (outcome.reason === "error") toast.error(outcome.message);
+    else toast.warning(outcome.message);
+  }
+
+  async function handleResume() {
+    setResuming(true);
+    try {
+      await reportWhatsAppRun("Sending started. Messages go out one at a time.");
+    } finally {
+      setResuming(false);
+    }
+  }
+
+  async function handleRetryFailed() {
+    setRetrying(true);
+    try {
+      const res = await whatsappApi.retryFailed(id);
+      const reset: number = res.data?.reset ?? 0;
+      if (reset === 0) toast.info("No failed messages to retry.");
+      else await reportWhatsAppRun(`Retrying ${reset.toLocaleString()} failed ${reset === 1 ? "message" : "messages"}.`);
+      loadDetail();
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(message || "Could not retry the failed messages.");
+    } finally {
+      setRetrying(false);
     }
   }
 
@@ -276,6 +326,7 @@ export default function BroadcastDetail() {
   const opened = validContacts.filter(c => c.queueStatus === "Opened");
   const sent = validContacts.filter(c => c.queueStatus === "Sent");
   const failed = validContacts.filter(c => c.queueStatus === "Failed");
+  const skipped = validContacts.filter(c => c.queueStatus === "Skipped");
   const pending = validContacts.filter(c => c.queueStatus === "Pending" || c.queueStatus === "Sending");
   const notQueued = validContacts.filter(c => c.queueStatus === null);
 
@@ -296,8 +347,17 @@ export default function BroadcastDetail() {
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard icon={<Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />} label="Sent" value={`${b.sentCount}/${b.totalRecipients}`} color="bg-blue-100 dark:bg-blue-900/30" />
-        <StatCard icon={<MailOpen className="h-4 w-4 text-green-600 dark:text-green-400" />} label="Unique Opens" value={`${openCount}/${b.totalRecipients}`} sub={`${openPct}% open rate`} color="bg-green-100 dark:bg-green-900/30" />
-        <StatCard icon={<Mail className="h-4 w-4 text-violet-600 dark:text-violet-400" />} label="Total Opens" value={`${totalOpenCount}`} sub="including re-opens" color="bg-violet-100 dark:bg-violet-900/30" />
+        {isWhatsApp ? (
+          <>
+            <StatCard icon={<Loader2 className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />} label="Waiting" value={`${pending.length}`} sub="queued to send" color="bg-yellow-100 dark:bg-yellow-900/30" />
+            <StatCard icon={<SkipForward className="h-4 w-4 text-amber-600 dark:text-amber-400" />} label="Skipped" value={`${skipped.length}`} sub="cannot receive it" color="bg-amber-100 dark:bg-amber-900/30" />
+          </>
+        ) : (
+          <>
+            <StatCard icon={<MailOpen className="h-4 w-4 text-green-600 dark:text-green-400" />} label="Unique Opens" value={`${openCount}/${b.totalRecipients}`} sub={`${openPct}% open rate`} color="bg-green-100 dark:bg-green-900/30" />
+            <StatCard icon={<Mail className="h-4 w-4 text-violet-600 dark:text-violet-400" />} label="Total Opens" value={`${totalOpenCount}`} sub="including re-opens" color="bg-violet-100 dark:bg-violet-900/30" />
+          </>
+        )}
         <StatCard icon={<XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />} label="Failed" value={`${b.failedCount}/${b.totalRecipients}`} color="bg-red-100 dark:bg-red-900/30" />
       </div>
 
@@ -358,9 +418,24 @@ export default function BroadcastDetail() {
       {pending.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
-              <Loader2 className="h-4 w-4 animate-spin" /> Pending ({pending.length})
+            <CardTitle className="text-sm flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
+                <Loader2 className={`h-4 w-4 ${!isWhatsApp || waRunActive ? "animate-spin" : ""}`} /> Pending ({pending.length})
+              </span>
+              {isWhatsApp && !waRunActive && (
+                <Button size="sm" onClick={handleResume} disabled={resuming}>
+                  {resuming ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Send className="h-3.5 w-3.5 mr-1" />}
+                  Send now
+                </Button>
+              )}
             </CardTitle>
+            {isWhatsApp && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {waRunActive
+                  ? "Sending one message at a time. Progress is on the WhatsApp page."
+                  : "These messages are queued but nothing is sending them right now."}
+              </p>
+            )}
           </CardHeader>
           <CardContent className="p-0">
             <ContactTable contacts={pending} primaryLabel={isWhatsApp ? "WhatsApp Number" : "Email"} secondaryLabel={isWhatsApp ? "Email" : "Phone"} />
@@ -371,12 +446,36 @@ export default function BroadcastDetail() {
       {failed.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2 text-red-700 dark:text-red-400">
-              <XCircle className="h-4 w-4" /> Failed ({failed.length})
+            <CardTitle className="text-sm flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-red-700 dark:text-red-400">
+                <XCircle className="h-4 w-4" /> Failed ({failed.length})
+              </span>
+              {isWhatsApp && (
+                <Button size="sm" variant="outline" onClick={handleRetryFailed} disabled={retrying}>
+                  {retrying ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <RotateCcw className="h-3.5 w-3.5 mr-1" />}
+                  Retry failed
+                </Button>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <ContactTable contacts={failed} primaryLabel={isWhatsApp ? "WhatsApp Number" : "Email"} secondaryLabel={isWhatsApp ? "Email" : "Phone"} />
+            <ContactTable contacts={failed} primaryLabel={isWhatsApp ? "WhatsApp Number" : "Email"} secondaryLabel={isWhatsApp ? "Email" : "Phone"} showReason={isWhatsApp} />
+          </CardContent>
+        </Card>
+      )}
+
+      {skipped.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2 text-amber-700 dark:text-amber-400">
+              <SkipForward className="h-4 w-4" /> Skipped ({skipped.length})
+            </CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">
+              These contacts cannot receive the message, so retrying will not help.
+            </p>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ContactTable contacts={skipped} primaryLabel="WhatsApp Number" secondaryLabel="Email" showReason />
           </CardContent>
         </Card>
       )}

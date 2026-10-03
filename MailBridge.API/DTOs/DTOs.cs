@@ -16,6 +16,12 @@ public record ConnectWhatsAppRequest(string? PhoneNumber, string? PushName, stri
 public record WhatsAppSendMessageRequest(string Phone, string Message);
 public record WhatsAppSendBatchRequest(List<WhatsAppSendMessageRequest> Messages);
 
+// ===== WhatsApp send queue (worked through by the desktop app) =====
+public record WhatsAppQueueItemDto(Guid Id, string PhoneNumber, string Body, Guid? BroadcastId);
+public record WhatsAppPendingResponse(List<WhatsAppQueueItemDto> Items, int TotalPending);
+public record WhatsAppSendResultRequest(string Status, string? Error);
+public record WhatsAppQueueStatsDto(int Pending, int Sending, int Sent, int Failed, int Skipped);
+
 // ===== Email Templates =====
 public record CreateTemplateRequest(string Name, string SubjectTemplate, string BodyTemplate, List<Guid>? AttachmentFileIds = null);
 public record UpdateTemplateRequest(string Name, string SubjectTemplate, string BodyTemplate, List<Guid>? AttachmentFileIds = null);
@@ -60,7 +66,8 @@ public record BroadcastResponse(
 public record BroadcastContactDto(
     string? Email, string? PhoneNumber, string? Name,
     string? QueueStatus,
-    DateTime? SentAt);
+    DateTime? SentAt,
+    string? ErrorInfo = null);
 
 public record BroadcastDetailResponse(
     BroadcastResponse Broadcast,

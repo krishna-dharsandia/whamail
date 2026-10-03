@@ -29,6 +29,7 @@
 ## Features
 
 - **Email Broadcasts** — Send bulk emails to your audience
+- **WhatsApp Broadcasts** — Send paced, personalised WhatsApp messages from your own linked account
 - **Audience Management** — Import, organize, and segment contacts
 - **Template Editor** — Create and reuse email templates
 - **Google OAuth** — Sign in with Google
@@ -140,6 +141,23 @@ Packaging `.deb` output requires `fpm`'s bundled toolchain to run, which in turn
 sudo dnf install -y libxcrypt-compat
 
 # Debian/Ubuntu — not required, fpm's bundled Ruby works out of the box
+```
+
+## WhatsApp sending
+
+WhatsApp messages are sent by the desktop app through a WhatsApp Web session linked to your own account, so the app has to stay open while a broadcast goes out. Google Chrome or Microsoft Edge must be installed; set `CHROME_PATH` to point at a different Chromium-based browser.
+
+How a WhatsApp broadcast is delivered:
+
+1. **Send** queues one message per contact in the API.
+2. The desktop app works through the queue one message at a time. Each number is checked on WhatsApp first; numbers without an account are marked **Skipped**, not failed.
+3. Between messages it waits the configured pause plus a random extra, backs off exponentially after a failure, and stops the run after too many failures in a row or when the hourly or daily limit is reached.
+
+The pace and limits are on the WhatsApp page under **Sending pace** (defaults: 30 s pause + up to 50% extra, 50 per hour, 100 per day). Bare local numbers get the default country code. Email templates are converted to WhatsApp text: bold, italic and links are kept, the rest of the HTML is dropped.
+
+```bash
+# Unit tests for the WhatsApp engine (pacing, phone numbers, send run)
+cd desktop && npm run test:whatsapp
 ```
 
 ## Release Process

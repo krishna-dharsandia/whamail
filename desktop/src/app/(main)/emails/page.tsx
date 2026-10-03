@@ -39,6 +39,7 @@ const STATUS_CLASS: Record<string, string> = {
   Sending: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
   Sent:    "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
   Failed:  "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+  Skipped: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
 };
 
 export default function EmailsPage() {
@@ -107,6 +108,7 @@ export default function EmailsPage() {
             <SelectItem value="Sending">Sending</SelectItem>
             <SelectItem value="Sent">Sent</SelectItem>
             <SelectItem value="Failed">Failed</SelectItem>
+            <SelectItem value="Skipped">Skipped</SelectItem>
           </SelectContent>
         </Select>
       </div>

@@ -2,6 +2,7 @@
 import { createContext, useContext, useEffect, useState, useRef, ReactNode, useCallback } from "react";
 import { createSupabaseClient } from "@/lib/supabase";
 import { authApi } from "@/lib/api";
+import { getWhatsAppBridge } from "@/hooks/use-whatsapp";
 import type { User, Session, SupabaseClient } from "@supabase/supabase-js";
 
 let supabaseInstance: SupabaseClient | null = null;
@@ -84,6 +85,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             subscription.unsubscribe();
             removeAuthListener?.();
         };
+    }, []);
+
+    // The desktop app sends WhatsApp messages from its main process, which
+    // records each result through the API. Keep it supplied with a valid token.
+    useEffect(() => {
+        getWhatsAppBridge()?.setAuthToken(session?.access_token ?? null);
+    }, [session]);
+
+    useEffect(() => {
+        const wa = getWhatsAppBridge();
+        if (!wa) return;
+        return wa.onAuthRequired(async () => {
+            // getSession() refreshes an expired token before returning it.
+            const { data } = await getSupabase()!.auth.getSession();
+            wa.setAuthToken(data.session?.access_token ?? null);
+        });
     }, []);
 
     const syncProfile = useCallback(async (sbUser: User) => {
