@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState, useCallback, DragEvent } from "react";
 import { toast } from "sonner";
-import { Info, Loader2, Mail, MessageCircle, Plus, Trash2, Upload, Users, X, ChevronRight, ChevronLeft } from "lucide-react";
+import { Info, Loader2, Mail, MessageCircle, Plus, RefreshCw, Trash2, Upload, Users, X, ChevronRight, ChevronLeft } from "lucide-react";
 
 import { audienceApi } from "@/lib/api";
+import { getWhatsAppBridge } from "@/hooks/use-whatsapp";
 import { PageActions, BreadcrumbLabel, useGlobalRefresh } from "../layout";
 import { useTableHeight } from "@/hooks/use-table-height";
 import { Button } from "@/components/ui/button";
@@ -713,6 +714,38 @@ export default function AudiencePage() {
     }
   }
 
+  const [syncingWhatsApp, setSyncingWhatsApp] = useState(false);
+
+  async function handleSyncWhatsApp() {
+    if (!activeAudience) return;
+    const wa = getWhatsAppBridge();
+    if (!wa) {
+      toast.error("Open the desktop app to sync WhatsApp contacts.");
+      return;
+    }
+    setSyncingWhatsApp(true);
+    try {
+      const result = await wa.getContacts();
+      if (!result.success) {
+        toast.error(result.error ?? "Could not read WhatsApp contacts. Make sure WhatsApp is connected.");
+        return;
+      }
+      if (result.contacts.length === 0) {
+        toast.info("No WhatsApp contacts found to sync.");
+        return;
+      }
+      const res = await audienceApi.bulkImportContacts(activeAudience.id, result.contacts);
+      toast.success(res.data.message ?? `Synced ${res.data.added} contacts.`);
+      await openAudience(activeAudience);
+      loadAudiences();
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Failed to sync contacts.";
+      toast.error(msg);
+    } finally {
+      setSyncingWhatsApp(false);
+    }
+  }
+
   async function handleCreateAudience(e: React.FormEvent) {
     e.preventDefault();
     if (!newName.trim()) return;
@@ -1007,6 +1040,14 @@ export default function AudiencePage() {
             <Upload className="h-4 w-4 mr-1" />
             Import CSV
           </Button>
+          {activeAudience.type === "whatsapp" && (
+            <Button variant="outline" size="sm" onClick={handleSyncWhatsApp} disabled={syncingWhatsApp}>
+              {syncingWhatsApp
+                ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                : <RefreshCw className="h-4 w-4 mr-1" />}
+              Sync from WhatsApp
+            </Button>
+          )}
           <Button size="sm" onClick={() => setAddContactOpen(true)}>
             <Plus className="h-4 w-4 mr-1" />
             Contact

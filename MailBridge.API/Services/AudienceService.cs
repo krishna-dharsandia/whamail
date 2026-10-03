@@ -16,6 +16,7 @@ public interface IAudienceService
     Task<ContactResponse> AddContactAsync(Guid userId, Guid audienceId, AddContactRequest request);
     Task DeleteContactAsync(Guid userId, Guid audienceId, Guid contactId);
     Task<(int added, int skipped)> UploadCsvAsync(Guid userId, Guid audienceId, string csvContent);
+    Task<(int added, int skipped)> BulkImportContactsAsync(Guid userId, Guid audienceId, List<BulkImportContactRequest> contacts);
 }
 
 public class AudienceService : IAudienceService
@@ -267,6 +268,50 @@ public class AudienceService : IAudienceService
                 Email = email,
                 PhoneNumber = phone,
                 Name = string.IsNullOrEmpty(name) ? null : name,
+                CreatedAt = DateTime.UtcNow,
+            });
+            added++;
+        }
+
+        if (newContacts.Count > 0)
+        {
+            _db.Contacts.AddRange(newContacts);
+            await _db.SaveChangesAsync();
+        }
+
+        return (added, skipped);
+    }
+
+    public async Task<(int added, int skipped)> BulkImportContactsAsync(Guid userId, Guid audienceId, List<BulkImportContactRequest> contacts)
+    {
+        var audience = await _db.Audiences.FirstOrDefaultAsync(a => a.Id == audienceId && a.UserId == userId)
+            ?? throw new InvalidOperationException("Audience not found.");
+
+        var existingPhonesList = await _db.Contacts
+            .Where(c => c.AudienceId == audienceId && c.PhoneNumber != null)
+            .Select(c => c.PhoneNumber!)
+            .ToListAsync();
+        var existingPhones = new HashSet<string>(existingPhonesList);
+
+        int added = 0, skipped = 0;
+        var newContacts = new List<Contact>();
+
+        foreach (var entry in contacts)
+        {
+            var phone = entry.PhoneNumber?.Trim();
+            if (string.IsNullOrEmpty(phone) || !IsValidPhone(phone) || existingPhones.Contains(phone))
+            {
+                skipped++;
+                continue;
+            }
+
+            existingPhones.Add(phone);
+            newContacts.Add(new Contact
+            {
+                Id = Guid.NewGuid(),
+                AudienceId = audienceId,
+                PhoneNumber = phone,
+                Name = string.IsNullOrWhiteSpace(entry.Name) ? null : entry.Name.Trim(),
                 CreatedAt = DateTime.UtcNow,
             });
             added++;

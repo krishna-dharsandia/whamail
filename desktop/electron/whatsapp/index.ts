@@ -126,6 +126,25 @@ export function initWhatsApp(options: WhatsAppInitOptions): void {
 
   ipcMain.handle("whatsapp:get-info", () => conn.getStatus().info ?? null);
 
+  ipcMain.handle("whatsapp:get-contacts", async () => {
+    if (!conn.isReady()) return { success: false, error: "WhatsApp is not connected.", contacts: [] };
+    try {
+      const waContacts = await conn.getClient().getContacts();
+      const seen = new Set<string>();
+      const contacts: { name: string; phoneNumber: string }[] = [];
+      for (const c of waContacts) {
+        if (c.isGroup || !c.isWAContact || !c.number) continue;
+        const { phone } = normalizePhone(c.number, settings.get().defaultCountryCode);
+        if (!phone || seen.has(phone)) continue;
+        seen.add(phone);
+        contacts.push({ name: c.name || c.pushname || phone, phoneNumber: phone });
+      }
+      return { success: true, contacts };
+    } catch (error) {
+      return { success: false, error: readableSendError(error), contacts: [] };
+    }
+  });
+
   ipcMain.handle("whatsapp:send-message", async (_event, phone: string, message: string) => {
     if (!conn.isReady()) return { success: false, error: "WhatsApp is not connected." };
     const result = await sendText(transport, String(phone ?? ""), String(message ?? ""), settings.get());

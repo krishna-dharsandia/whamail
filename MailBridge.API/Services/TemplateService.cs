@@ -26,7 +26,7 @@ public class TemplateService : ITemplateService
         return await _db.EmailTemplates
             .Where(t => t.UserId == userId)
             .OrderByDescending(t => t.UpdatedAt)
-            .Select(t => new TemplateResponse(t.Id, t.Name, t.SubjectTemplate, t.BodyTemplate, t.CreatedAt, t.UpdatedAt, ParseFileIds(t.AttachmentFileIds)))
+            .Select(t => new TemplateResponse(t.Id, t.Name, t.Channel, t.SubjectTemplate, t.BodyTemplate, t.CreatedAt, t.UpdatedAt, ParseFileIds(t.AttachmentFileIds)))
             .ToListAsync();
     }
 
@@ -46,7 +46,8 @@ public class TemplateService : ITemplateService
             Id = Guid.NewGuid(),
             UserId = userId,
             Name = request.Name,
-            SubjectTemplate = request.SubjectTemplate,
+            Channel = request.Channel,
+            SubjectTemplate = request.SubjectTemplate ?? string.Empty,
             BodyTemplate = request.BodyTemplate,
             AttachmentFileIds = SerializeFileIds(attachmentFileIds),
             CreatedAt = DateTime.UtcNow,
@@ -67,7 +68,7 @@ public class TemplateService : ITemplateService
         var attachmentFileIds = await NormalizeFileIdsAsync(userId, request.AttachmentFileIds);
 
         template.Name = request.Name;
-        template.SubjectTemplate = request.SubjectTemplate;
+        template.SubjectTemplate = request.SubjectTemplate ?? string.Empty;
         template.BodyTemplate = request.BodyTemplate;
         template.AttachmentFileIds = SerializeFileIds(attachmentFileIds);
         template.UpdatedAt = DateTime.UtcNow;
@@ -87,7 +88,7 @@ public class TemplateService : ITemplateService
     }
 
     private static TemplateResponse MapToResponse(EmailTemplate t) =>
-        new(t.Id, t.Name, t.SubjectTemplate, t.BodyTemplate, t.CreatedAt, t.UpdatedAt, ParseFileIds(t.AttachmentFileIds));
+        new(t.Id, t.Name, t.Channel, t.SubjectTemplate, t.BodyTemplate, t.CreatedAt, t.UpdatedAt, ParseFileIds(t.AttachmentFileIds));
 
     private static List<Guid>? ParseFileIds(string? json)
     {

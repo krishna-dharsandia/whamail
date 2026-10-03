@@ -18,8 +18,11 @@ public class EmailTemplate
     [MaxLength(255)]
     public string Name { get; set; } = string.Empty;
 
+    [Column("channel")]
+    [MaxLength(20)]
+    public string Channel { get; set; } = "email"; // "email" or "whatsapp"
+
     [Column("subject_template")]
-    [Required]
     [MaxLength(500)]
     public string SubjectTemplate { get; set; } = string.Empty;
 

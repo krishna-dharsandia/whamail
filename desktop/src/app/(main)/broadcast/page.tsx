@@ -56,6 +56,7 @@ interface Audience {
 interface Template {
   id: string;
   name: string;
+  channel: string;
   subjectTemplate: string;
 }
 
@@ -191,8 +192,9 @@ export default function BroadcastPage() {
   }
 
   const filteredAudiences = audiences.filter((a) => a.type === form.channel);
+  const filteredTemplates = templates.filter((t) => t.channel === form.channel);
   const selectedAudience = filteredAudiences.find((a) => a.id === form.audienceId);
-  const selectedTemplate = templates.find((t) => t.id === form.templateId);
+  const selectedTemplate = filteredTemplates.find((t) => t.id === form.templateId);
   const canProceedStep1 = !!form.name.trim();
   const canProceedStep2 = !!form.audienceId && !!form.templateId;
 
@@ -201,6 +203,12 @@ export default function BroadcastPage() {
       setForm((current) => ({ ...current, audienceId: "" }));
     }
   }, [filteredAudiences, form.audienceId]);
+
+  useEffect(() => {
+    if (form.templateId && !filteredTemplates.some((t) => t.id === form.templateId)) {
+      setForm((current) => ({ ...current, templateId: "" }));
+    }
+  }, [filteredTemplates, form.templateId]);
 
   // Sort broadcasts: Sending first, then Draft, Completed, Failed
   const STATUS_ORDER: Record<string, number> = { Sending: 0, Draft: 1, Completed: 2, Failed: 3 };
@@ -461,13 +469,25 @@ export default function BroadcastPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Template</Label>
-                    {templates.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">No templates found. Create one first.</p>
+                    {filteredTemplates.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        No {form.channel === "whatsapp" ? "WhatsApp" : "email"} templates found.{" "}
+                        <button
+                          type="button"
+                          className="text-primary underline underline-offset-2"
+                          onClick={() => {
+                            setWizardOpen(false);
+                            router.push("/templates");
+                          }}
+                        >
+                          Create one first.
+                        </button>
+                      </p>
                     ) : (
                       <Select value={form.templateId} onValueChange={(v) => setForm((f) => ({ ...f, templateId: v }))}>
                         <SelectTrigger><SelectValue placeholder="Select a template" /></SelectTrigger>
                         <SelectContent>
-                          {templates.map((t) => (
+                          {filteredTemplates.map((t) => (
                             <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                           ))}
                         </SelectContent>

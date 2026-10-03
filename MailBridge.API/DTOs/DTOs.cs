@@ -22,10 +22,10 @@ public record WhatsAppPendingResponse(List<WhatsAppQueueItemDto> Items, int Tota
 public record WhatsAppSendResultRequest(string Status, string? Error);
 public record WhatsAppQueueStatsDto(int Pending, int Sending, int Sent, int Failed, int Skipped);
 
-// ===== Email Templates =====
-public record CreateTemplateRequest(string Name, string SubjectTemplate, string BodyTemplate, List<Guid>? AttachmentFileIds = null);
-public record UpdateTemplateRequest(string Name, string SubjectTemplate, string BodyTemplate, List<Guid>? AttachmentFileIds = null);
-public record TemplateResponse(Guid Id, string Name, string SubjectTemplate, string BodyTemplate, DateTime CreatedAt, DateTime UpdatedAt, List<Guid>? AttachmentFileIds = null);
+// ===== Templates (email or whatsapp) =====
+public record CreateTemplateRequest(string Name, string BodyTemplate, string Channel = "email", string? SubjectTemplate = null, List<Guid>? AttachmentFileIds = null);
+public record UpdateTemplateRequest(string Name, string BodyTemplate, string? SubjectTemplate = null, List<Guid>? AttachmentFileIds = null);
+public record TemplateResponse(Guid Id, string Name, string Channel, string SubjectTemplate, string BodyTemplate, DateTime CreatedAt, DateTime UpdatedAt, List<Guid>? AttachmentFileIds = null);
 
 // ===== User Files =====
 public record UserFileResponse(
@@ -36,10 +36,6 @@ public record UserFileResponse(
     DateTime CreatedAt,
     int UsageCount = 0,
     List<string>? TemplateNames = null);
-
-// ===== Message Templates (WhatsApp) =====
-public record CreateMessageTemplateRequest(string Name, string BodyTemplate);
-public record UpdateMessageTemplateRequest(string Name, string BodyTemplate);
 
 // ===== Email Queue =====
 public record QueueEmailRequest(string Recipient, Guid? TemplateId, string? Subject, string? Body, Dictionary<string, string>? MergeData, string? PhoneNumber = null, string Channel = "email");
@@ -52,6 +48,8 @@ public record CreateAudienceRequest(string Name, string Type = "email");
 public record AudienceResponse(Guid Id, string Name, int ContactCount, DateTime CreatedAt, string Type = "email", int BroadcastCount = 0);
 public record ContactResponse(Guid Id, string? Email, string? PhoneNumber, string? Name, DateTime CreatedAt);
 public record AddContactRequest(string? Email, string? PhoneNumber, string? Name);
+public record BulkImportContactRequest(string? PhoneNumber, string? Name);
+public record BulkImportContactsRequest(List<BulkImportContactRequest> Contacts);
 
 // ===== Broadcasts =====
 public record CreateBroadcastRequest(string Name, Guid AudienceId, Guid TemplateId, string? SubjectOverride, string Channel = "email");

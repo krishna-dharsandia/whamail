@@ -69,6 +69,7 @@ interface WhatsAppBridge {
   resetSession: () => Promise<{ success: boolean; error?: string }>;
   sendMessage: (phone: string, message: string) => Promise<{ success: boolean; error?: string; messageId?: string }>;
   checkNumber: (phone: string) => Promise<{ registered: boolean; phone?: string; error?: string }>;
+  getContacts: () => Promise<{ success: boolean; error?: string; contacts: { name: string; phoneNumber: string }[] }>;
   getRunState: () => Promise<SendRunState>;
   startRun: (input?: { broadcastId?: string | null }) => Promise<{ success: boolean; error?: string; state: SendRunState }>;
   stopRun: () => Promise<{ success: boolean; state: SendRunState }>;

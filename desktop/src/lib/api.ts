@@ -66,9 +66,9 @@ export const credentialApi = {
 export const templateApi = {
   getAll: async () => (await getApi()).get("/templates"),
   getById: async (id: string) => (await getApi()).get(`/templates/${id}`),
-  create: async (data: { name: string; subjectTemplate: string; bodyTemplate: string; attachmentFileIds?: string[] }) =>
+  create: async (data: { name: string; channel: "email" | "whatsapp"; subjectTemplate?: string; bodyTemplate: string; attachmentFileIds?: string[] }) =>
     (await getApi()).post("/templates", data),
-  update: async (id: string, data: { name: string; subjectTemplate: string; bodyTemplate: string; attachmentFileIds?: string[] }) =>
+  update: async (id: string, data: { name: string; subjectTemplate?: string; bodyTemplate: string; attachmentFileIds?: string[] }) =>
     (await getApi()).put(`/templates/${id}`, data),
   delete: async (id: string) => (await getApi()).delete(`/templates/${id}`),
 };
@@ -84,6 +84,8 @@ export const audienceApi = {
     (await getApi()).post(`/audiences/${id}/contacts`, data),
   deleteContact: async (audienceId: string, contactId: string) =>
     (await getApi()).delete(`/audiences/${audienceId}/contacts/${contactId}`),
+  bulkImportContacts: async (id: string, contacts: { phoneNumber: string; name?: string }[]) =>
+    (await getApi()).post(`/audiences/${id}/contacts/bulk`, { contacts }),
   uploadCsv: async (id: string, file: File) => {
     const formData = new FormData();
     formData.append("file", file);

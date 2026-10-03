@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, File, LayoutTemplate, Loader2, Paperclip, Pencil, Plus, Tags, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, File, LayoutTemplate, Loader2, Mail, MessageCircle, Paperclip, Pencil, Plus, Tags, Trash2, X } from "lucide-react";
 import { audienceApi, fileApi, templateApi } from "@/lib/api";
 import { useTableHeight } from "@/hooks/use-table-height";
 import { Button } from "@/components/ui/button";
@@ -14,15 +14,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { UnlayerEditor, type UnlayerEditorHandle, type UnlayerDesign } from "@/components/unlayer-editor";
 import { BreadcrumbLabel, PageActions, useGlobalRefresh } from "../layout";
 
+type Channel = "email" | "whatsapp";
+
 interface Template {
   id: string;
   name: string;
+  channel: Channel;
   subjectTemplate: string;
   bodyTemplate: string;
   createdAt: string;
@@ -95,7 +99,8 @@ export default function TemplatesPage() {
   const [deleting, setDeleting] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [form, setForm] = useState({ name: "", subjectTemplate: "" });
+  const [form, setForm] = useState({ name: "", subjectTemplate: "", bodyText: "" });
+  const [channel, setChannel] = useState<Channel>("email");
   const [initialDesign, setInitialDesign] = useState<UnlayerDesign | null>(null);
 
   // Audiences for merge-tag selector
@@ -166,7 +171,8 @@ export default function TemplatesPage() {
   }
 
   function openNew() {
-    setForm({ name: "", subjectTemplate: "" });
+    setForm({ name: "", subjectTemplate: "", bodyText: "" });
+    setChannel("email");
     setInitialDesign(null);
     setSelectedAudienceId("");
     setActiveMergeTags(DEFAULT_MERGE_TAGS);
@@ -174,6 +180,7 @@ export default function TemplatesPage() {
     setEditing({
       id: "new",
       name: "",
+      channel: "email",
       subjectTemplate: "",
       bodyTemplate: "",
       createdAt: "",
@@ -182,7 +189,8 @@ export default function TemplatesPage() {
   }
 
   function openEdit(t: Template) {
-    setForm({ name: t.name, subjectTemplate: t.subjectTemplate });
+    setForm({ name: t.name, subjectTemplate: t.subjectTemplate, bodyText: t.channel === "whatsapp" ? t.bodyTemplate : "" });
+    setChannel(t.channel);
     setInitialDesign(loadDesignLocally(t.id));
     setSelectedAudienceId("");
     setActiveMergeTags(DEFAULT_MERGE_TAGS);
@@ -192,33 +200,56 @@ export default function TemplatesPage() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim() || !form.subjectTemplate.trim()) {
-      toast.error("Name and subject are required.");
+    if (!form.name.trim()) {
+      toast.error("Name is required.");
       return;
     }
-    if (!editorRef.current) {
-      toast.error("Editor is not ready yet.");
+    if (channel === "email" && !form.subjectTemplate.trim()) {
+      toast.error("Subject is required.");
       return;
     }
+    if (channel === "whatsapp" && !form.bodyText.trim()) {
+      toast.error("Message text is required.");
+      return;
+    }
+
     setSaving(true);
     try {
-      const { html, design } = await editorRef.current.exportHtml();
-      const payload = {
-        name: form.name.trim(),
-        subjectTemplate: form.subjectTemplate.trim(),
-        bodyTemplate: html,
-        attachmentFileIds: selectedFileIds.length > 0 ? selectedFileIds : undefined,
-      };
+      let payload: { name: string; channel?: Channel; subjectTemplate?: string; bodyTemplate: string; attachmentFileIds?: string[] };
+      let design: UnlayerDesign | null = null;
+
+      if (channel === "whatsapp") {
+        payload = {
+          name: form.name.trim(),
+          channel: "whatsapp",
+          bodyTemplate: form.bodyText.trim(),
+        };
+      } else {
+        if (!editorRef.current) {
+          toast.error("Editor is not ready yet.");
+          setSaving(false);
+          return;
+        }
+        const exported = await editorRef.current.exportHtml();
+        design = exported.design;
+        payload = {
+          name: form.name.trim(),
+          channel: "email",
+          subjectTemplate: form.subjectTemplate.trim(),
+          bodyTemplate: exported.html,
+          attachmentFileIds: selectedFileIds.length > 0 ? selectedFileIds : undefined,
+        };
+      }
 
       if (isNew) {
-        const res = await templateApi.create(payload);
+        const res = await templateApi.create(payload as Parameters<typeof templateApi.create>[0]);
         localStorage.removeItem(STORAGE_KEY("new"));
-        saveDesignLocally(res.data.id, design);
+        if (design) saveDesignLocally(res.data.id, design);
         setTemplates((prev) => [res.data, ...prev]);
         toast.success("Template created.");
       } else if (editing) {
         const res = await templateApi.update(editing.id, payload);
-        saveDesignLocally(editing.id, design);
+        if (design) saveDesignLocally(editing.id, design);
         setTemplates((prev) =>
           prev.map((t) => (t.id === editing.id ? res.data : t))
         );
@@ -275,24 +306,52 @@ export default function TemplatesPage() {
         </PageActions>
 
         <form id="template-form" onSubmit={handleSave} className="flex flex-col flex-1 min-h-0 gap-4">
+          {isNew && (
+            <div className="space-y-2">
+              <Label>Channel</Label>
+              <div className="grid grid-cols-2 gap-2 max-w-md">
+                <button
+                  type="button"
+                  onClick={() => setChannel("email")}
+                  className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border-2 text-sm font-medium transition-colors ${
+                    channel === "email" ? "border-primary bg-primary/5" : "border-muted hover:border-muted-foreground/30"
+                  }`}
+                >
+                  <Mail className="h-4 w-4" /> Email
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChannel("whatsapp")}
+                  className={`flex items-center justify-center gap-2 p-2.5 rounded-lg border-2 text-sm font-medium transition-colors ${
+                    channel === "whatsapp" ? "border-primary bg-primary/5" : "border-muted hover:border-muted-foreground/30"
+                  }`}
+                >
+                  <MessageCircle className="h-4 w-4" /> WhatsApp
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Name + Subject row */}
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className={channel === "whatsapp" ? "grid gap-4" : "grid sm:grid-cols-2 gap-4"}>
             <div className="space-y-2">
               <Label>Template Name</Label>
               <Input
-                placeholder="e.g. Welcome Email"
+                placeholder={channel === "whatsapp" ? "e.g. Order Confirmation" : "e.g. Welcome Email"}
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Subject</Label>
-              <Input
-                placeholder="e.g. Welcome, {{name}}!"
-                value={form.subjectTemplate}
-                onChange={(e) => setForm((f) => ({ ...f, subjectTemplate: e.target.value }))}
-              />
-            </div>
+            {channel === "email" && (
+              <div className="space-y-2">
+                <Label>Subject</Label>
+                <Input
+                  placeholder="e.g. Welcome, {{name}}!"
+                  value={form.subjectTemplate}
+                  onChange={(e) => setForm((f) => ({ ...f, subjectTemplate: e.target.value }))}
+                />
+              </div>
+            )}
           </div>
 
           {/* Merge Tags section */}
@@ -350,54 +409,71 @@ export default function TemplatesPage() {
             </div>
           </div>
 
-          {/* Attachments */}
-          <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
-              <span className="text-sm font-medium">Attachments</span>
-              <span className="text-xs text-muted-foreground">
-                Select files to attach when sending emails with this template
-              </span>
-            </div>
-            {availableFiles.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No files uploaded. Go to Files to upload.</p>
-            ) : (
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {availableFiles.map((f) => {
-                  const isSelected = selectedFileIds.includes(f.id);
-                  return (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => setSelectedFileIds((prev) =>
-                        isSelected ? prev.filter((id) => id !== f.id) : [...prev, f.id]
-                      )}
-                      className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md border transition-colors ${
-                        isSelected
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-muted-foreground/20 text-muted-foreground hover:border-muted-foreground/40"
-                      }`}
-                      title={f.usageCount ? `Already used in ${f.usageCount} template${f.usageCount === 1 ? "" : "s"}.` : "Not used in other templates yet."}
-                    >
-                      <File className="h-3 w-3" />
-                      {f.originalName}
-                      {isSelected && <X className="h-3 w-3" />}
-                    </button>
-                  );
-                })}
+          {/* Attachments — email only */}
+          {channel === "email" && (
+            <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+                <span className="text-sm font-medium">Attachments</span>
+                <span className="text-xs text-muted-foreground">
+                  Select files to attach when sending emails with this template
+                </span>
               </div>
-            )}
-          </div>
+              {availableFiles.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No files uploaded. Go to Files to upload.</p>
+              ) : (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {availableFiles.map((f) => {
+                    const isSelected = selectedFileIds.includes(f.id);
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => setSelectedFileIds((prev) =>
+                          isSelected ? prev.filter((id) => id !== f.id) : [...prev, f.id]
+                        )}
+                        className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-md border transition-colors ${
+                          isSelected
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-muted-foreground/20 text-muted-foreground hover:border-muted-foreground/40"
+                        }`}
+                        title={f.usageCount ? `Already used in ${f.usageCount} template${f.usageCount === 1 ? "" : "s"}.` : "Not used in other templates yet."}
+                      >
+                        <File className="h-3 w-3" />
+                        {f.originalName}
+                        {isSelected && <X className="h-3 w-3" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
 
-          {/* Drag-and-drop email editor */}
-          <div>
-            <UnlayerEditor
-              key={editing.id}
-              ref={editorRef}
-              initialDesign={initialDesign}
-              mergeTags={activeMergeTags}
-            />
-          </div>
+          {/* Message body — plain text for WhatsApp, drag-and-drop editor for email */}
+          {channel === "whatsapp" ? (
+            <div className="flex flex-col flex-1 min-h-0 gap-2">
+              <Label>Message</Label>
+              <Textarea
+                placeholder={"Hi {{name}}, your order is confirmed!"}
+                value={form.bodyText}
+                onChange={(e) => setForm((f) => ({ ...f, bodyText: e.target.value }))}
+                className="flex-1 min-h-48 font-mono text-sm resize-none"
+              />
+              <p className="text-xs text-muted-foreground">
+                Plain text, as it will appear on WhatsApp. *bold*, _italic_ and links are supported.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <UnlayerEditor
+                key={editing.id}
+                ref={editorRef}
+                initialDesign={initialDesign}
+                mergeTags={activeMergeTags}
+              />
+            </div>
+          )}
         </form>
       </div>
     );
@@ -433,7 +509,8 @@ export default function TemplatesPage() {
               <thead>
                 <tr className="border-b bg-muted/50">
                   <th className="text-left px-4 py-2 font-medium">Name</th>
-                  <th className="text-left px-4 py-2 font-medium">Subject</th>
+                  <th className="text-left px-4 py-2 font-medium">Channel</th>
+                  <th className="text-left px-4 py-2 font-medium">Subject / Message</th>
                   <th className="text-left px-4 py-2 font-medium">Updated</th>
                   <th className="text-right px-4 py-2 font-medium w-24">Actions</th>
                 </tr>
@@ -446,7 +523,19 @@ export default function TemplatesPage() {
                     onClick={() => openEdit(t)}
                   >
                     <td className="px-4 py-2 font-medium">{t.name}</td>
-                    <td className="px-4 py-2 text-muted-foreground truncate max-w-xs">{t.subjectTemplate}</td>
+                    <td className="px-4 py-2">
+                      <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                        t.channel === "whatsapp"
+                          ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                          : "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
+                      }`}>
+                        {t.channel === "whatsapp" ? <MessageCircle className="h-3 w-3" /> : <Mail className="h-3 w-3" />}
+                        {t.channel === "whatsapp" ? "WA" : "Email"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-muted-foreground truncate max-w-xs">
+                      {t.channel === "whatsapp" ? t.bodyTemplate : t.subjectTemplate}
+                    </td>
                     <td className="px-4 py-2 text-muted-foreground">{new Date(t.updatedAt).toLocaleDateString()}</td>
                     <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-end gap-1">

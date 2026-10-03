@@ -104,6 +104,20 @@ public class AudiencesController : ControllerBase
         }
     }
 
+    [HttpPost("{id}/contacts/bulk")]
+    public async Task<IActionResult> BulkImportContacts(Guid id, [FromBody] BulkImportContactsRequest request)
+    {
+        try
+        {
+            var (added, skipped) = await _audienceService.BulkImportContactsAsync(GetUserId(), id, request.Contacts);
+            return Ok(new { added, skipped, message = $"Imported {added} contacts. Skipped {skipped} duplicates/invalid." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
     [HttpPost("{id}/upload")]
     public async Task<IActionResult> UploadCsv(Guid id, IFormFile file)
     {
